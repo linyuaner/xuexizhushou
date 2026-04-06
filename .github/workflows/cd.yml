@@ -26,6 +26,8 @@ on:
 env:
   # GitHub Container Registry 镜像名
   GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/study-helper
+  # 强制使用 Node.js 24 运行 actions
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ─────────────────────────────────────────────────────
