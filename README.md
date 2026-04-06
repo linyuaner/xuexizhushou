@@ -92,7 +92,8 @@ npm run dev
 - 前端地址: http://localhost:5173
 - 后端API: http://localhost:3000
 - API健康检查: http://localhost:3000/api/health
-- 默认管理员: 用户名 `admin`，密码 `admin123`
+- 默认管理员: 用户名 `admin`，密码首次启动时自动生成
+- 查看初始密码: 启动后查看日志 `npm start` 输出或 `docker compose logs app`
 
 ## 项目结构
 
@@ -162,19 +163,7 @@ npm run dev
 - `GET /api/stats/progress` - 学习进度统计
 - `GET /api/stats/trend` - 练习趋势分析
 
-## 示例数据
 
-系统会自动创建以下示例数据：
-
-### 分类
-- 数学
-- 语文
-- 英语
-- 物理
-- 化学
-
-### 题目
-每个分类下包含多道题目，涵盖不同难度。
 
 ## 使用说明
 

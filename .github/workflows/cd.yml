@@ -1,7 +1,7 @@
 # =============================================================================
 # CD - 持续部署工作流
 # 触发：推送到 main 分支 / 手动触发（workflow_dispatch）
-# 职责：构建多架构 Docker 镜像 → 推送到 Docker Hub / GHCR → 部署到服务器
+# 职责：构建多架构 Docker 镜像 → 推送到 GHCR
 # =============================================================================
 
 name: CD
@@ -19,36 +19,21 @@ on:
       - 'vite.config.js'
       - 'uno.config.ts'
       - 'index.html'
-  # 手动触发（支持选择环境）
+  # 手动触发
   workflow_dispatch:
-    inputs:
-      environment:
-        description: '部署环境'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
 
 # 全局变量（修改镜像名称请改这里）
 env:
-  # Docker Hub 镜像名（格式：用户名/镜像名）
-  DOCKERHUB_IMAGE: ${{ github.actor }}/study-helper
   # GitHub Container Registry 镜像名
   GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/study-helper
 
 jobs:
   # ─────────────────────────────────────────────────────
-  # Job 1: 构建并推送 Docker 镜像
+  # Job 1: 构建并推送 Docker 镜像到 GHCR
   # ─────────────────────────────────────────────────────
   build-and-push:
-    name: 构建 & 推送镜像
+    name: 构建 & 推送镜像到 GHCR
     runs-on: ubuntu-latest
-    # 输出镜像 digest，供后续 Job 使用
-    outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-      image-tag: ${{ steps.meta.outputs.version }}
     permissions:
       contents: read
       packages: write
@@ -64,7 +49,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.DOCKERHUB_IMAGE }}
             ${{ env.GHCR_IMAGE }}
           tags: |
             type=ref,event=branch
@@ -77,14 +61,6 @@ jobs:
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 登录 Docker Hub
-      - name: 登录 Docker Hub
-        if: ${{ env.DOCKERHUB_IMAGE != '' }}
-        uses: docker/login-action@v3
-        with:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       # 登录 GitHub Container Registry
       - name: 登录 GHCR
         uses: docker/login-action@v3
@@ -94,7 +70,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # 构建并推送（同时支持 linux/amd64 + linux/arm64）
-      - name: 构建并推送 Docker 镜像
+      - name: 构建并推送 Docker 镜像到 GHCR
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -119,120 +95,16 @@ jobs:
           echo "| 镜像标签 | \`${{ steps.meta.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 镜像摘要 | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 提交SHA | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 镜像地址 | \`${{ env.GHCR_IMAGE }}:latest\` |" >> $GITHUB_STEP_SUMMARY
 
-  # ─────────────────────────────────────────────────────
-  # Job 2: 部署到生产服务器（SSH）
-  # ─────────────────────────────────────────────────────
-  deploy-production:
-    name: 部署到生产服务器
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    # 使用 GitHub Environments 保护规则（可配置审批）
-    environment:
-      name: production
-      url: http://localhost:3000
-    # 仅在 main 分支或手动选择 production 时触发
-    if: |
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event.inputs.environment == 'production')
-
-    steps:
-      - name: 检出代码（仅取 docker-compose.yml）
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            docker-compose.yml
-
-      - name: 通过 SSH 部署到服务器
-        uses: appleboy/ssh-action@v1
-        with:
-          host: localhost
-          username: ${{ github.actor }}
-          key: ${{ secrets.GITHUB_TOKEN }}
-          port: 22
-          script: |
-            set -e
-            
-            echo "📦 拉取最新镜像..."
-            docker pull ${{ env.GHCR_IMAGE }}:latest
-            
-            echo "🔄 停止旧容器..."
-            docker stop study-helper-app 2>/dev/null || true
-            docker rm   study-helper-app 2>/dev/null || true
-            
-            echo "🚀 启动新容器..."
-            docker run -d \
-              --name study-helper-app \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              -e NODE_ENV=production \
-              -e JWT_SECRET=default-jwt-secret-key \
-              -v quiz-data:/app/server/data \
-              -v quiz-uploads:/app/server/uploads \
-              --log-driver json-file \
-              --log-opt max-size=10m \
-              --log-opt max-file=3 \
-              ${{ env.GHCR_IMAGE }}:latest
-            
-            echo "⏳ 等待健康检查..."
-            for i in {1..10}; do
-              if docker exec study-helper-app wget -qO- http://localhost:3000/api/health 2>/dev/null; then
-                echo ""
-                echo "✅ 部署成功！"
-                exit 0
-              fi
-              echo "  第 $i 次等待..."
-              sleep 3
-            done
-            echo "❌ 健康检查失败，回滚..."
-            docker stop study-helper-app && docker rm study-helper-app
-            exit 1
-
-      - name: 通知部署结果
+      - name: 通知构建结果
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "## ✅ 部署成功" >> $GITHUB_STEP_SUMMARY
-            echo "- 环境：production" >> $GITHUB_STEP_SUMMARY
-            echo "- 镜像：\`${{ env.GHCR_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+            echo "## ✅ 镜像发布成功" >> $GITHUB_STEP_SUMMARY
+            echo "- 镜像已发布到：\`${{ env.GHCR_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
             echo "- 时间：$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           else
-            echo "## ❌ 部署失败" >> $GITHUB_STEP_SUMMARY
-            echo "请检查 SSH 连接和服务器日志。" >> $GITHUB_STEP_SUMMARY
+            echo "## ❌ 镜像发布失败" >> $GITHUB_STEP_SUMMARY
+            echo "请检查构建日志获取详细信息。" >> $GITHUB_STEP_SUMMARY
           fi
-
-  # ─────────────────────────────────────────────────────
-  # Job 3: 部署到预发布环境（可选）
-  # ─────────────────────────────────────────────────────
-  deploy-staging:
-    name: 部署到预发布环境
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    environment:
-      name: staging
-      url: http://localhost:3001
-    if: github.event.inputs.environment == 'staging'
-
-    steps:
-      - name: 通过 SSH 部署到预发布服务器
-        uses: appleboy/ssh-action@v1
-        with:
-          host: localhost
-          username: ${{ github.actor }}
-          key: ${{ secrets.GITHUB_TOKEN }}
-          port: 22
-          script: |
-            set -e
-            docker pull ${{ env.GHCR_IMAGE }}:latest
-            docker stop study-helper-staging 2>/dev/null || true
-            docker rm   study-helper-staging 2>/dev/null || true
-            docker run -d \
-              --name study-helper-staging \
-              --restart unless-stopped \
-              -p 3001:3000 \
-              -e NODE_ENV=staging \
-              -e JWT_SECRET=default-staging-jwt-secret-key \
-              -v quiz-data-staging:/app/server/data \
-              -v quiz-uploads-staging:/app/server/uploads \
-              ${{ env.GHCR_IMAGE }}:latest
-            echo "✅ 预发布环境部署完成"

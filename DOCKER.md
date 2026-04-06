@@ -85,7 +85,8 @@ http://localhost:3000
 
 默认管理员账号：
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：首次启动时自动生成随机密码
+- 查看初始密码：`docker compose logs app | grep "Admin password"`
 
 ---
 
