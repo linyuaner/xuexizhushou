@@ -9,8 +9,8 @@ services:
       dockerfile: Dockerfile
       # 利用 BuildKit 缓存加速重复构建
       cache_from:
-        - ghcr.io/linyuaner/study-helper:latest
-    image: ghcr.io/linyuaner/study-helper:latest
+        - jqlshr/study-helper:latest
+    image: jqlshr/study-helper:latest
     container_name: study-helper-app
     restart: unless-stopped
     ports:

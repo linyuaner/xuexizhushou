@@ -24,6 +24,8 @@ on:
 
 # 全局变量（修改镜像名称请改这里）
 env:
+  # Docker Hub 镜像名
+  DOCKERHUB_IMAGE: ${{ github.actor }}/study-helper
   # GitHub Container Registry 镜像名
   GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/study-helper
   # 强制使用 Node.js 24 运行 actions
@@ -51,6 +53,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
+            ${{ env.DOCKERHUB_IMAGE }}
             ${{ env.GHCR_IMAGE }}
           tags: |
             type=ref,event=branch
@@ -63,6 +66,14 @@ jobs:
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # 登录 Docker Hub
+      - name: 登录 Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       # 登录 GitHub Container Registry
       - name: 登录 GHCR
         uses: docker/login-action@v3
@@ -72,7 +83,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # 构建并推送（同时支持 linux/amd64 + linux/arm64）
-      - name: 构建并推送 Docker 镜像到 GHCR
+      - name: 构建并推送 Docker 镜像到 Docker Hub 和 GHCR
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -97,14 +108,17 @@ jobs:
           echo "| 镜像标签 | \`${{ steps.meta.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 镜像摘要 | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 提交SHA | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 镜像地址 | \`${{ env.GHCR_IMAGE }}:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| GHCR 镜像 | \`${{ env.GHCR_IMAGE }}:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Hub 镜像 | \`${{ env.DOCKERHUB_IMAGE }}:latest\` |" >> $GITHUB_STEP_SUMMARY
 
       - name: 通知构建结果
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
             echo "## ✅ 镜像发布成功" >> $GITHUB_STEP_SUMMARY
-            echo "- 镜像已发布到：\`${{ env.GHCR_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- 镜像已发布到：" >> $GITHUB_STEP_SUMMARY
+            echo "  - GHCR: \`${{ env.GHCR_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "  - Docker Hub: \`${{ env.DOCKERHUB_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
             echo "- 时间：$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           else
             echo "## ❌ 镜像发布失败" >> $GITHUB_STEP_SUMMARY

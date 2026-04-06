@@ -23,14 +23,15 @@
 
 > 仓库需要开启 Packages 权限，默认情况下是开启的。
 
-### 可选配置（如果需要使用 Docker Hub）
+### Docker Hub 配置（可选，推荐）
 
 | Secret 名称 | 说明 |
 |-------------|------|
 | `DOCKERHUB_USERNAME` | Docker Hub 用户名 |
 | `DOCKERHUB_TOKEN` | Docker Hub Access Token（[生成地址](https://hub.docker.com/settings/security)） |
 
-> 本项目默认只推送到 GHCR，如需推送到 Docker Hub，请修改 `cd.yml` 文件中的镜像配置。
+> 本项目会同时推送到 Docker Hub 和 GHCR，Docker Hub 配置为可选。
+> 如果未设置 Docker Hub secrets，工作流会跳过 Docker Hub 推送，但仍会推送到 GHCR。
 
 ---
 
