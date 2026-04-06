@@ -89,6 +89,36 @@ http://localhost:3000
 
 ---
 
+## 密码重置
+
+如果需要重置用户密码，可以在Docker容器中运行密码重置脚本：
+
+```bash
+# 进入运行中的容器
+docker exec -it study-helper-app sh
+
+# 在容器内运行密码重置脚本
+node reset-password.js <用户名> <新密码>
+
+# 示例：重置admin用户密码
+node reset-password.js admin newpassword123
+
+# 退出容器
+exit
+```
+
+或者一行命令：
+```bash
+docker exec -it study-helper-app node reset-password.js admin newpassword123
+```
+
+**注意事项：**
+- 新密码长度至少6位
+- 只有能访问Docker终端的用户才能重置密码
+- 重置密码后需要重新登录
+
+---
+
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
