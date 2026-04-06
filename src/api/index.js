@@ -1,7 +1,12 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+// 根据环境自动选择API地址
+// 生产环境使用相对路径（与前端同源）
+// 开发环境使用环境变量或默认localhost
+const baseURL = import.meta.env.PROD 
+  ? '/api' 
+  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api')
 
 const instance = axios.create({
   baseURL,
