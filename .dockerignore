@@ -1,0 +1,56 @@
+# ============================================================
+# .dockerignore - 减小构建上下文，加快镜像构建速度
+# ============================================================
+
+# 依赖目录（各 Stage 内独立安装）
+node_modules/
+server/node_modules/
+
+# 构建产物（由 Docker 内部构建）
+dist/
+build/
+
+# 开发/调试文件
+*.log
+*.local
+.env.local
+.env.development
+.env.development.local
+.env.test.local
+
+# 编辑器 & IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Git
+.git/
+.gitignore
+
+# 测试
+coverage/
+*.test.js
+*.spec.js
+
+# 文档 & 工具脚本（不需要进入镜像）
+README.md
+*.md
+generate-xlsx.js
+test-questions.xlsx
+
+# Docker 自身（避免递归）
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# 运行时数据（使用 Volume 挂载，不打包进镜像）
+server/data/
+server/uploads/

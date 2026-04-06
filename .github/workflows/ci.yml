@@ -1,0 +1,170 @@
+# =============================================================================
+# CI - 持续集成工作流
+# 触发：PR 到 main/develop，或直接推送到 main/develop
+# 职责：依赖安装、前端构建验证、后端语法检查、单元测试
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# 同一个 PR/分支只保留最新一次运行，自动取消旧的
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────
+  # Job 1: 前端构建验证
+  # ─────────────────────────────────────────────────────
+  frontend-build:
+    name: 前端构建验证
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: 安装前端依赖
+        run: npm ci --prefer-offline
+
+      - name: 构建前端
+        run: npm run build
+        env:
+          # 构建时的 API 地址（CI 环境下用占位符即可）
+          VITE_API_BASE_URL: http://localhost:3000/api
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 3
+
+  # ─────────────────────────────────────────────────────
+  # Job 2: 后端依赖与语法验证
+  # ─────────────────────────────────────────────────────
+  backend-check:
+    name: 后端验证
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: 安装后端依赖
+        run: npm ci --prefer-offline
+
+      - name: Node.js 语法检查（--check）
+        run: |
+          echo "检查 JS 文件语法..."
+          find . -name "*.js" -not -path "./node_modules/*" | xargs node --input-type=module --check 2>/dev/null || \
+          node --check index.js && \
+          for f in routes/*.js middleware/*.js utils/*.js; do
+            node --check "$f" && echo "  ✅ $f"
+          done
+
+      - name: 验证服务器可以启动（dry-run）
+        run: |
+          # 用超时启动，验证无崩溃性错误（5秒后自动退出）
+          timeout 5 node index.js && exit 0 || \
+          [ $? -eq 124 ] && echo "✅ 服务器可正常启动（超时退出符合预期）" && exit 0 || \
+          echo "❌ 服务器启动失败" && exit 1
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci-test-secret-key
+          PORT: 13000
+
+  # ─────────────────────────────────────────────────────
+  # Job 3: 单元测试（Vitest）
+  # ─────────────────────────────────────────────────────
+  frontend-test:
+    name: 前端单元测试
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: 安装依赖
+        run: npm ci --prefer-offline
+
+      - name: 运行测试
+        run: npm test --if-present
+        env:
+          VITE_API_BASE_URL: http://localhost:3000/api
+
+  # ─────────────────────────────────────────────────────
+  # Job 4: Docker 镜像构建验证（不推送）
+  # ─────────────────────────────────────────────────────
+  docker-build-check:
+    name: Docker 构建验证
+    runs-on: ubuntu-latest
+    # 仅在前两个 Job 通过后运行
+    needs: [frontend-build, backend-check]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 构建 Docker 镜像（不推送）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: study-helper:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 启动容器做健康检查
+        run: |
+          docker run -d \
+            --name study-helper-ci \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e JWT_SECRET=ci-health-check-secret \
+            study-helper:ci-test
+
+          echo "等待服务启动..."
+          for i in {1..15}; do
+            if curl -sf http://localhost:3000/api/health; then
+              echo ""
+              echo "✅ 健康检查通过！"
+              docker stop study-helper-ci
+              exit 0
+            fi
+            echo "  第 $i 次尝试，等待 2s..."
+            sleep 2
+          done
+          echo "❌ 健康检查超时"
+          docker logs study-helper-ci
+          docker stop study-helper-ci
+          exit 1
