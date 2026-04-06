@@ -9,8 +9,8 @@ services:
       dockerfile: Dockerfile
       # 利用 BuildKit 缓存加速重复构建
       cache_from:
-        - study-helper:latest
-    image: study-helper:latest
+        - ghcr.io/linyuaner/study-helper:latest
+    image: ghcr.io/linyuaner/study-helper:latest
     container_name: study-helper-app
     restart: unless-stopped
     ports:
@@ -18,8 +18,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # JWT 密钥：生产环境请通过 .env 或 secrets 注入
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      # JWT 密钥：系统会自动生成安全的随机密钥
     volumes:
       # 数据持久化：SQLite 数据库文件
       - quiz-data:/app/server/data

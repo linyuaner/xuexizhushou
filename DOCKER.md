@@ -56,7 +56,7 @@ docker compose down -v
 
 ```bash
 # 构建镜像
-docker build -t study-helper:latest .
+docker build -t ghcr.io/linyuaner/study-helper:latest .
 
 # 运行容器
 docker run -d \
@@ -66,7 +66,7 @@ docker run -d \
   -e JWT_SECRET=your-secret-key \
   -v study-helper-data:/app/server/data \
   -v study-helper-uploads:/app/server/uploads \
-  study-helper:latest
+  ghcr.io/linyuaner/study-helper:latest
 ```
 
 ---
