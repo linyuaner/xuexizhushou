@@ -6,7 +6,7 @@
       :collapse-transition="false"
       router
     >
-      <el-menu-item index="/">
+      <el-menu-item index="/home">
         <el-icon><HomeFilled /></el-icon>
         <template #title>首页</template>
       </el-menu-item>

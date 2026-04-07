@@ -8,7 +8,7 @@
           <el-button type="primary" size="large" @click="$router.push('/questions')">
             开始刷题
           </el-button>
-          <el-button size="large" @click="$router.push('/login')" v-if="!isLoggedIn">
+          <el-button size="large" @click="$router.push('/')" v-if="!isLoggedIn">
             登录账号
           </el-button>
         </div>

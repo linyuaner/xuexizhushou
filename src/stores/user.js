@@ -24,7 +24,7 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', res.data.token)
       await fetchUserInfo()
       ElMessage.success('登录成功')
-      router.push('/')
+      router.push('/home')
       return res
     } catch (error) {
       ElMessage.error(error.message || '登录失败')
@@ -40,7 +40,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await api.post('/auth/register', { email, password, username })
       ElMessage.success('注册成功，请登录')
-      router.push('/login')
+      router.push('/')
       return res
     } catch (error) {
       ElMessage.error(error.message || '注册失败')
@@ -55,7 +55,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
-    router.push('/login')
+    router.push('/')
     ElMessage.success('已退出登录')
   }
 
