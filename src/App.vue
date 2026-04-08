@@ -2,7 +2,7 @@
   <div class="app-container">
     <AppHeader />
     <div class="app-main">
-      <AppSidebar v-if="isLoggedIn && !isMobile" />
+      <AppSidebar v-if="isLoggedIn" />
       <main class="main-content">
         <router-view />
       </main>
