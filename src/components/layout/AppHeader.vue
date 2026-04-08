@@ -102,6 +102,7 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 20px;
 }
 
@@ -113,12 +114,6 @@ onUnmounted(() => {
   font-size: 1.2rem;
   font-weight: bold;
   color: var(--primary);
-  margin-right: 40px;
-}
-
-.header-menu {
-  flex: 1;
-  border: none;
 }
 
 .header-actions {
@@ -132,26 +127,5 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-}
-
-.hamburger-btn {
-  margin-left: 8px;
-}
-
-:deep(.mobile-menu-drawer) {
-  .el-drawer__body {
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
-  }
-}
-
-.mobile-menu {
-  flex: 1;
-  border: none;
-}
-
-.mobile-menu-footer {
-  padding: 20px;
 }
 </style>
