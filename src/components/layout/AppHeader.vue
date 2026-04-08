@@ -1,7 +1,7 @@
 <template>
   <el-header class="app-header">
     <div class="header-content">
-      <div class="logo" @click="$router.push('/')">
+      <div class="logo" @click="$router.push(isLoggedIn ? '/home' : '/')">
         <el-icon :size="28"><Reading /></el-icon>
         <span>刷题助手</span>
       </div>
@@ -13,7 +13,7 @@
         class="header-menu"
         v-if="!isMobile"
       >
-        <el-menu-item index="/" @click="$router.push('/')">首页</el-menu-item>
+        <el-menu-item index="/home" @click="$router.push('/home')">首页</el-menu-item>
         <el-menu-item index="/questions" @click="$router.push('/questions')">题目</el-menu-item>
         <el-menu-item v-if="isLoggedIn" index="/practice" @click="$router.push('/practice')">练习</el-menu-item>
         <el-menu-item v-if="isLoggedIn" index="/banks" @click="$router.push('/banks')">题库</el-menu-item>
@@ -71,7 +71,7 @@ const handleCommand = (command) => {
     router.push('/profile')
   } else if (command === 'logout') {
     userStore.logout()
-    router.push('/login')
+    router.push('/')
   }
 }
 </script>
