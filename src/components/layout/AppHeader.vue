@@ -44,7 +44,7 @@
           </el-dropdown>
         </template>
         <template v-else>
-          <el-button type="primary" @click="$router.push('/')">登录</el-button>
+          <el-button type="primary" @click="$router.push('/login')">登录</el-button>
         </template>
         <el-button 
           v-if="isMobile" 
@@ -80,7 +80,7 @@
       </el-menu>
       <div class="mobile-menu-footer">
         <template v-if="!isLoggedIn">
-          <el-button type="primary" @click="$router.push('/')" style="width: 100%">登录</el-button>
+          <el-button type="primary" @click="$router.push('/login')" style="width: 100%">登录</el-button>
         </template>
         <template v-else>
           <el-button @click="handleCommand('logout')" style="width: 100%">退出登录</el-button>
