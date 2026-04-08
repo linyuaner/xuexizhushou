@@ -48,9 +48,11 @@ html, body, #app {
 
 .app-main {
   display: flex;
+  min-height: calc(100vh - 64px);
 }
 
 .main-content {
   flex: 1;
+  min-height: 100%;
 }
 </style>
