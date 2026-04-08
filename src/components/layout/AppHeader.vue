@@ -1,5 +1,5 @@
 <template>
-  <el-header class="app-header">
+  <el-header class="app-header" :class="{ scrolled: isScrolled }">
     <div class="header-content">
       <div class="logo" @click="$router.push(isLoggedIn ? '/home' : '/')">
         <el-icon :size="28"><Reading /></el-icon>
@@ -44,16 +44,53 @@
         <template v-else>
           <el-button type="primary" @click="$router.push('/login')">登录</el-button>
         </template>
+        <el-button 
+          v-if="isMobile" 
+          text 
+          class="hamburger-btn"
+          @click="toggleMobileMenu"
+        >
+          <el-icon v-if="!mobileMenuOpen"><Menu /></el-icon>
+          <el-icon v-else><Close /></el-icon>
+        </el-button>
       </div>
     </div>
+
+    <el-drawer
+      v-model="mobileMenuOpen"
+      direction="rtl"
+      size="70%"
+      :with-header="false"
+      class="mobile-menu-drawer"
+    >
+      <el-menu
+        :default-active="activeMenu"
+        @select="handleMenuSelect"
+        class="mobile-menu"
+      >
+        <el-menu-item index="/home">首页</el-menu-item>
+        <el-menu-item index="/questions">题目</el-menu-item>
+        <el-menu-item v-if="isLoggedIn" index="/practice">练习</el-menu-item>
+        <el-menu-item v-if="isLoggedIn" index="/banks">题库</el-menu-item>
+        <el-menu-item v-if="isLoggedIn" index="/profile">个人中心</el-menu-item>
+      </el-menu>
+      <div class="mobile-menu-footer">
+        <template v-if="!isLoggedIn">
+          <el-button type="primary" @click="$router.push('/login')" style="width: 100%">登录</el-button>
+        </template>
+        <template v-else>
+          <el-button @click="handleCommand('logout')" style="width: 100%">退出登录</el-button>
+        </template>
+      </div>
+    </el-drawer>
   </el-header>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Reading, User, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { Reading, User, ArrowDown, SwitchButton, Menu, Close } from '@element-plus/icons-vue'
 import { useWindowSize } from '@vueuse/core'
 
 const route = useRoute()
@@ -66,6 +103,22 @@ const userInfo = computed(() => userStore.userInfo)
 const isMobile = computed(() => width.value < 768)
 const activeMenu = computed(() => route.path)
 
+const isScrolled = ref(false)
+const mobileMenuOpen = ref(false)
+
+const handleScroll = () => {
+  isScrolled.value = window.scrollY > 10
+}
+
+const toggleMobileMenu = () => {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+const handleMenuSelect = (index) => {
+  mobileMenuOpen.value = false
+  router.push(index)
+}
+
 const handleCommand = (command) => {
   if (command === 'profile') {
     router.push('/profile')
@@ -74,14 +127,35 @@ const handleCommand = (command) => {
     router.push('/')
   }
 }
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>
 
 <style scoped>
 .app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   background: white;
   border-bottom: 1px solid #eee;
   padding: 0;
-  height: 60px;
+  height: 64px;
+  transition: all 0.3s ease;
+}
+
+.app-header.scrolled {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
@@ -120,5 +194,26 @@ const handleCommand = (command) => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
+}
+
+.hamburger-btn {
+  margin-left: 8px;
+}
+
+:deep(.mobile-menu-drawer) {
+  .el-drawer__body {
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.mobile-menu {
+  flex: 1;
+  border: none;
+}
+
+.mobile-menu-footer {
+  padding: 20px;
 }
 </style>

@@ -43,6 +43,7 @@ html, body, #app {
 .app-container {
   min-height: 100vh;
   background: #f5f7fa;
+  padding-top: 64px;
 }
 
 .app-main {
@@ -51,6 +52,6 @@ html, body, #app {
 
 .main-content {
   flex: 1;
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 64px);
 }
 </style>
