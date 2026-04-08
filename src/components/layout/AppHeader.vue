@@ -13,10 +13,12 @@
         class="header-menu"
         v-if="!isMobile"
       >
-        <el-menu-item index="/home" @click="$router.push('/home')">首页</el-menu-item>
-        <el-menu-item index="/questions" @click="$router.push('/questions')">题目</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/practice" @click="$router.push('/practice')">练习</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/banks" @click="$router.push('/banks')">题库</el-menu-item>
+        <template v-if="isLoggedIn">
+          <el-menu-item index="/home" @click="$router.push('/home')">首页</el-menu-item>
+          <el-menu-item index="/questions" @click="$router.push('/questions')">题目</el-menu-item>
+          <el-menu-item index="/practice" @click="$router.push('/practice')">练习</el-menu-item>
+          <el-menu-item index="/banks" @click="$router.push('/banks')">题库</el-menu-item>
+        </template>
       </el-menu>
 
       <div class="header-actions">
@@ -68,11 +70,13 @@
         @select="handleMenuSelect"
         class="mobile-menu"
       >
-        <el-menu-item index="/home">首页</el-menu-item>
-        <el-menu-item index="/questions">题目</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/practice">练习</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/banks">题库</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/profile">个人中心</el-menu-item>
+        <template v-if="isLoggedIn">
+          <el-menu-item index="/home">首页</el-menu-item>
+          <el-menu-item index="/questions">题目</el-menu-item>
+          <el-menu-item index="/practice">练习</el-menu-item>
+          <el-menu-item index="/banks">题库</el-menu-item>
+          <el-menu-item index="/profile">个人中心</el-menu-item>
+        </template>
       </el-menu>
       <div class="mobile-menu-footer">
         <template v-if="!isLoggedIn">
