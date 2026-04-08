@@ -55,7 +55,7 @@ const activeMenu = computed(() => route.path)
 .app-sidebar {
   background: var(--sidebar);
   border-right: 1px solid var(--sidebar-border);
-  height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px);
   transition: width 0.3s;
 }
 
