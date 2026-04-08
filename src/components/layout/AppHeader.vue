@@ -148,18 +148,18 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   z-index: 1000;
-  background: white;
-  border-bottom: 1px solid #eee;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
   padding: 0;
   height: 64px;
   transition: all 0.3s ease;
 }
 
 .app-header.scrolled {
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in oklch, var(--background) 80%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 20px color-mix(in oklch, var(--shadow-color) calc(var(--shadow-opacity) * 2), transparent);
 }
 
 .header-content {
@@ -178,7 +178,7 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 1.2rem;
   font-weight: bold;
-  color: #409eff;
+  color: var(--primary);
   margin-right: 40px;
 }
 

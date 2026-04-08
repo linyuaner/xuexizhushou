@@ -221,7 +221,7 @@ onMounted(async () => {
   position: relative;
   min-height: calc(100vh - 64px);
   padding: 80px 20px;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  background: linear-gradient(135deg, var(--muted) 0%, var(--background) 100%);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -232,14 +232,14 @@ onMounted(async () => {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.6;
+  opacity: 0.4;
   pointer-events: none;
 }
 
 .glow-1 {
   width: 400px;
   height: 400px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--chart-1);
   top: -100px;
   left: -100px;
   animation: float 8s ease-in-out infinite;
@@ -248,7 +248,7 @@ onMounted(async () => {
 .glow-2 {
   width: 300px;
   height: 300px;
-  background: linear-gradient(135deg, #f093fb, #f5576c);
+  background: var(--chart-2);
   top: 50%;
   right: -50px;
   animation: float 10s ease-in-out infinite reverse;
@@ -257,7 +257,7 @@ onMounted(async () => {
 .glow-3 {
   width: 350px;
   height: 350px;
-  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  background: var(--chart-3);
   bottom: -100px;
   left: 30%;
   animation: float 12s ease-in-out infinite;
@@ -289,7 +289,7 @@ onMounted(async () => {
 .gradient-text {
   font-size: 3.5rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--chart-2) 50%, var(--chart-3) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -299,7 +299,7 @@ onMounted(async () => {
 
 .subtitle {
   font-size: 1.3rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--muted-foreground);
   margin-bottom: 40px;
 }
 
@@ -311,43 +311,45 @@ onMounted(async () => {
 }
 
 .primary-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   padding: 16px 40px;
   font-size: 1.1rem;
   font-weight: 600;
+  border-radius: var(--radius);
   transition: all 0.3s ease;
 }
 
 .primary-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 10px 40px color-mix(in oklch, var(--primary) 40%, transparent);
 }
 
 .secondary-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
   padding: 16px 40px;
   font-size: 1.1rem;
   font-weight: 600;
+  border-radius: var(--radius);
   transition: all 0.3s ease;
 }
 
 .secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--accent);
   transform: translateY(-2px);
 }
 
 .dashboard-preview {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
   padding: 30px;
   max-width: 700px;
   margin: 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 var(--shadow-offset-y) var(--shadow-blur) var(--shadow-spread) color-mix(in oklch, var(--shadow-color) var(--shadow-opacity), transparent);
 }
 
 .dashboard-header {
@@ -360,7 +362,7 @@ onMounted(async () => {
 .dashboard-title {
   font-size: 1.2rem;
   font-weight: 600;
-  color: white;
+  color: var(--card-foreground);
 }
 
 .dashboard-status {
@@ -368,14 +370,14 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--muted-foreground);
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #10b981;
+  background: var(--chart-5);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -396,8 +398,8 @@ onMounted(async () => {
 }
 
 .mini-card {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--muted);
+  border-radius: var(--radius);
   padding: 16px;
   text-align: center;
 }
@@ -405,18 +407,18 @@ onMounted(async () => {
 .mini-value {
   font-size: 1.8rem;
   font-weight: 700;
-  color: white;
+  color: var(--card-foreground);
   margin-bottom: 4px;
 }
 
 .mini-label {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--muted-foreground);
 }
 
 .chart-placeholder {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
+  background: var(--accent);
+  border-radius: var(--radius);
   padding: 24px;
   height: 150px;
   display: flex;
@@ -436,8 +438,8 @@ onMounted(async () => {
 
 .chart-bar {
   width: 30px;
-  background: linear-gradient(180deg, #667eea, #764ba2);
-  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, var(--chart-1), var(--chart-4));
+  border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
   animation: barGrow 1.5s ease-out forwards;
   transform-origin: bottom;
 }
@@ -467,17 +469,17 @@ onMounted(async () => {
 .section-title {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--foreground);
   margin-bottom: 12px;
 }
 
 .section-desc {
   font-size: 1.1rem;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .stats-section {
-  background: white;
+  background: var(--background);
 }
 
 .stats-grid {
@@ -487,45 +489,46 @@ onMounted(async () => {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
   padding: 32px;
   text-align: center;
-  border: 1px solid #e2e8f0;
   transition: all 0.3s ease;
 }
 
 .stat-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 40px color-mix(in oklch, var(--shadow-color) calc(var(--shadow-opacity) * 2), transparent);
+  border-color: var(--primary);
 }
 
 .stat-icon {
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--chart-2));
+  border-radius: calc(var(--radius) * 2);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 20px;
-  color: white;
+  color: var(--primary-foreground);
 }
 
 .stat-value {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--card-foreground);
   margin-bottom: 8px;
 }
 
 .stat-label {
   font-size: 1rem;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .features-section {
-  background: #f8fafc;
+  background: var(--muted);
 }
 
 .features-grid {
@@ -535,49 +538,49 @@ onMounted(async () => {
 }
 
 .feature-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--card);
+  border-radius: calc(var(--radius) * 2);
   padding: 40px 30px;
   text-align: center;
   border: 2px solid transparent;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 var(--shadow-offset-y) var(--shadow-blur) var(--shadow-spread) color-mix(in oklch, var(--shadow-color) calc(var(--shadow-opacity) / 2), transparent);
 }
 
 .feature-card:hover {
   transform: translateY(-8px);
-  border-color: #667eea;
-  box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+  border-color: var(--primary);
+  box-shadow: 0 20px 40px color-mix(in oklch, var(--primary) 15%, transparent);
 }
 
 .feature-card:hover .feature-icon {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--chart-2));
+  color: var(--primary-foreground);
   transform: scale(1.1);
 }
 
 .feature-icon {
   width: 80px;
   height: 80px;
-  background: #f1f5f9;
-  border-radius: 20px;
+  background: var(--accent);
+  border-radius: calc(var(--radius) * 3);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 24px;
-  color: #667eea;
+  color: var(--accent-foreground);
   transition: all 0.3s ease;
 }
 
 .feature-card h3 {
   font-size: 1.4rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--card-foreground);
   margin-bottom: 12px;
 }
 
 .feature-card p {
-  color: #64748b;
+  color: var(--muted-foreground);
   line-height: 1.6;
 }
 

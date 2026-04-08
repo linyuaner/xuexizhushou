@@ -53,8 +53,8 @@ const activeMenu = computed(() => route.path)
 
 <style scoped>
 .app-sidebar {
-  background: white;
-  border-right: 1px solid #eee;
+  background: var(--sidebar);
+  border-right: 1px solid var(--sidebar-border);
   height: calc(100vh - 64px);
   position: relative;
   transition: width 0.3s;
@@ -67,10 +67,10 @@ const activeMenu = computed(() => route.path)
   transform: translateX(-50%);
   cursor: pointer;
   padding: 8px;
-  color: #999;
+  color: var(--muted-foreground);
 }
 
 .collapse-btn:hover {
-  color: #409eff;
+  color: var(--sidebar-primary);
 }
 </style>
