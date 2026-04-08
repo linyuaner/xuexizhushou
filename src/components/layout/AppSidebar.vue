@@ -6,26 +6,28 @@
       :collapse-transition="false"
       router
     >
-      <el-menu-item index="/home">
-        <el-icon><HomeFilled /></el-icon>
-        <template #title>首页</template>
-      </el-menu-item>
-      <el-menu-item index="/questions">
-        <el-icon><Document /></el-icon>
-        <template #title>题目</template>
-      </el-menu-item>
-      <el-menu-item index="/practice" v-if="isLoggedIn">
-        <el-icon><Edit /></el-icon>
-        <template #title>练习</template>
-      </el-menu-item>
-      <el-menu-item index="/banks" v-if="isLoggedIn">
-        <el-icon><FolderOpened /></el-icon>
-        <template #title>题库</template>
-      </el-menu-item>
-      <el-menu-item index="/profile" v-if="isLoggedIn">
-        <el-icon><User /></el-icon>
-        <template #title>个人中心</template>
-      </el-menu-item>
+      <template v-if="isLoggedIn">
+        <el-menu-item index="/home">
+          <el-icon><HomeFilled /></el-icon>
+          <template #title>首页</template>
+        </el-menu-item>
+        <el-menu-item index="/questions">
+          <el-icon><Document /></el-icon>
+          <template #title>题目</template>
+        </el-menu-item>
+        <el-menu-item index="/practice">
+          <el-icon><Edit /></el-icon>
+          <template #title>练习</template>
+        </el-menu-item>
+        <el-menu-item index="/banks">
+          <el-icon><FolderOpened /></el-icon>
+          <template #title>题库</template>
+        </el-menu-item>
+        <el-menu-item index="/profile">
+          <el-icon><User /></el-icon>
+          <template #title>个人中心</template>
+        </el-menu-item>
+      </template>
     </el-menu>
     
     <div class="collapse-btn" @click="isCollapse = !isCollapse">
@@ -51,24 +53,20 @@ const activeMenu = computed(() => route.path)
 
 <style scoped>
 .app-sidebar {
-  background: white;
-  border-right: 1px solid #eee;
-  height: calc(100vh - 60px);
-  position: relative;
+  background: var(--sidebar);
+  border-right: 1px solid var(--sidebar-border);
   transition: width 0.3s;
 }
 
 .collapse-btn {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  margin-top: 20px;
+  text-align: center;
   cursor: pointer;
   padding: 8px;
-  color: #999;
+  color: var(--muted-foreground);
 }
 
 .collapse-btn:hover {
-  color: #409eff;
+  color: var(--sidebar-primary);
 }
 </style>

@@ -3,6 +3,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
+    redirect: '/login'
+  },
+  {
+    path: '/login',
     name: 'Login',
     component: () => import('@/views/LoginView.vue'),
     meta: { guest: true }
@@ -10,17 +14,20 @@ const routes = [
   {
     path: '/home',
     name: 'Home',
-    component: () => import('@/views/HomeView.vue')
+    component: () => import('@/views/HomeView.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/questions',
     name: 'Questions',
-    component: () => import('@/views/QuestionsView.vue')
+    component: () => import('@/views/QuestionsView.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/questions/:id',
     name: 'QuestionDetail',
-    component: () => import('@/views/QuestionDetailView.vue')
+    component: () => import('@/views/QuestionDetailView.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/practice',

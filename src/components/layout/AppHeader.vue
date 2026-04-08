@@ -1,23 +1,10 @@
 <template>
-  <el-header class="app-header">
+  <el-header class="app-header" :class="{ scrolled: isScrolled }">
     <div class="header-content">
       <div class="logo" @click="$router.push(isLoggedIn ? '/home' : '/')">
         <el-icon :size="28"><Reading /></el-icon>
         <span>刷题助手</span>
       </div>
-      
-      <el-menu 
-        mode="horizontal" 
-        :default-active="activeMenu" 
-        :ellipsis="false"
-        class="header-menu"
-        v-if="!isMobile"
-      >
-        <el-menu-item index="/home" @click="$router.push('/home')">首页</el-menu-item>
-        <el-menu-item index="/questions" @click="$router.push('/questions')">题目</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/practice" @click="$router.push('/practice')">练习</el-menu-item>
-        <el-menu-item v-if="isLoggedIn" index="/banks" @click="$router.push('/banks')">题库</el-menu-item>
-      </el-menu>
 
       <div class="header-actions">
         <template v-if="isLoggedIn">
@@ -50,13 +37,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { Reading, User, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
 import { useWindowSize } from '@vueuse/core'
 
-const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const { width } = useWindowSize()
@@ -64,7 +50,12 @@ const { width } = useWindowSize()
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const userInfo = computed(() => userStore.userInfo)
 const isMobile = computed(() => width.value < 768)
-const activeMenu = computed(() => route.path)
+
+const isScrolled = ref(false)
+
+const handleScroll = () => {
+  isScrolled.value = window.scrollY > 10
+}
 
 const handleCommand = (command) => {
   if (command === 'profile') {
@@ -74,14 +65,35 @@ const handleCommand = (command) => {
     router.push('/')
   }
 }
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>
 
 <style scoped>
 .app-header {
-  background: white;
-  border-bottom: 1px solid #eee;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
   padding: 0;
-  height: 60px;
+  height: 64px;
+  transition: all 0.3s ease;
+}
+
+.app-header.scrolled {
+  background: color-mix(in oklch, var(--background) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 20px color-mix(in oklch, var(--shadow-color) calc(var(--shadow-opacity) * 2), transparent);
 }
 
 .header-content {
@@ -90,6 +102,7 @@ const handleCommand = (command) => {
   height: 100%;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 20px;
 }
 
@@ -100,13 +113,7 @@ const handleCommand = (command) => {
   cursor: pointer;
   font-size: 1.2rem;
   font-weight: bold;
-  color: #409eff;
-  margin-right: 40px;
-}
-
-.header-menu {
-  flex: 1;
-  border: none;
+  color: var(--primary);
 }
 
 .header-actions {

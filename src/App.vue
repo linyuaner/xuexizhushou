@@ -2,8 +2,8 @@
   <div class="app-container">
     <AppHeader />
     <div class="app-main">
-      <AppSidebar v-if="isLoggedIn && !isMobile" />
-      <main class="main-content">
+      <AppSidebar v-if="isLoggedIn" />
+      <main class="main-content" :class="{ 'with-sidebar': isLoggedIn }">
         <router-view />
       </main>
     </div>
@@ -43,14 +43,16 @@ html, body, #app {
 .app-container {
   min-height: 100vh;
   background: #f5f7fa;
+  padding-top: 64px;
 }
 
 .app-main {
   display: flex;
+  min-height: calc(100vh - 64px);
 }
 
 .main-content {
   flex: 1;
-  min-height: calc(100vh - 60px);
+  min-height: 100%;
 }
 </style>
