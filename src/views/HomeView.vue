@@ -214,7 +214,6 @@ onMounted(async () => {
 
 <style scoped>
 .home {
-  overflow: hidden;
 }
 
 .hero {
