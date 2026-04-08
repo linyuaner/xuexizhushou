@@ -3,7 +3,7 @@
     <AppHeader />
     <div class="app-main">
       <AppSidebar v-if="isLoggedIn" />
-      <main class="main-content">
+      <main class="main-content" :class="{ 'with-sidebar': isLoggedIn }">
         <router-view />
       </main>
     </div>
@@ -53,5 +53,10 @@ html, body, #app {
 .main-content {
   flex: 1;
   min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s;
+}
+
+.main-content.with-sidebar {
+  margin-left: 200px;
 }
 </style>
