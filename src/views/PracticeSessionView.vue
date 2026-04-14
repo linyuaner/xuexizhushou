@@ -5,11 +5,39 @@
         <span>题目 {{ currentIndex + 1 }} / {{ questionIds.length }}</span>
         <el-progress :percentage="progress" :stroke-width="8" style="width: 200px" />
       </div>
-      <div class="timer" v-if="practiceType === 'exam'">
-        <el-icon><Timer /></el-icon>
-        <span>{{ formatTime(timeLeft) }}</span>
+      <div class="header-actions">
+        <el-button @click="showQuestionSelector = true" size="small">
+          选择题目
+        </el-button>
+        <div class="timer" v-if="practiceType === 'exam'">
+          <el-icon><Timer /></el-icon>
+          <span>{{ formatTime(timeLeft) }}</span>
+        </div>
       </div>
     </div>
+
+    <!-- 题目选择器 -->
+    <el-dialog v-model="showQuestionSelector" title="选择题目" width="600px">
+      <div class="question-selector">
+        <div 
+          v-for="(questionId, index) in questionIds" 
+          :key="questionId"
+          class="question-item"
+          :class="{ 
+            'current': index === currentIndex, 
+            'answered': answeredQuestions.includes(questionId),
+            'correct': questionResults[questionId] === true,
+            'wrong': questionResults[questionId] === false
+          }"
+          @click="goToQuestion(index)"
+        >
+          <span class="question-number">{{ index + 1 }}</span>
+          <span class="question-status" v-if="answeredQuestions.includes(questionId)">
+            {{ questionResults[questionId] === true ? '✓' : '✗' }}
+          </span>
+        </div>
+      </div>
+    </el-dialog>
 
     <div class="question-area" v-if="currentQuestion">
       <div class="question-header">
@@ -91,6 +119,7 @@ const sessionId = ref(route.query.session_id)
 const questionIds = ref(JSON.parse(route.query.questions || '[]'))
 const practiceType = ref(route.query.type || 'sequential')
 const startIndex = ref(parseInt(route.query.start_index) || 0)
+const settings = ref(JSON.parse(route.query.settings || '{}'))
 
 const currentIndex = ref(startIndex.value)
 const currentQuestion = ref(null)
@@ -98,9 +127,12 @@ const selectedAnswer = ref(null)
 const textAnswer = ref('')
 const showResult = ref(false)
 const lastAnswer = ref(null)
-const timeLeft = ref(3600)
+const timeLeft = ref(settings.value.time_limit || 3600)
 const timer = ref(null)
 const isCompleted = ref(false)
+const showQuestionSelector = ref(false)
+const answeredQuestions = ref([])
+const questionResults = ref({}) // 存储题目的对错状态
 
 const progress = computed(() => {
   if (questionIds.value.length === 0) return 0
@@ -123,10 +155,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timer.value) clearInterval(timer.value)
-  // 自动完成练习
-  if (sessionId.value && !isCompleted.value) {
-    api.post(`/practice/sessions/${sessionId.value}/complete`).catch(() => {})
-  }
+  // 不自动完成练习，保留练习进度
 })
 
 const startTimer = () => {
@@ -213,6 +242,14 @@ const submitAnswer = async () => {
     
     lastAnswer.value = res.data
     showResult.value = true
+    
+    // 记录已回答的题目
+    if (!answeredQuestions.value.includes(currentQuestion.value.id)) {
+      answeredQuestions.value.push(currentQuestion.value.id)
+    }
+    
+    // 记录题目的对错状态
+    questionResults.value[currentQuestion.value.id] = res.data.is_correct
   } catch (error) {
     ElMessage.error('提交失败')
   }
@@ -221,6 +258,12 @@ const submitAnswer = async () => {
 const nextQuestion = () => {
   currentIndex.value++
   loadCurrentQuestion()
+}
+
+const goToQuestion = (index) => {
+  currentIndex.value = index
+  loadCurrentQuestion()
+  showQuestionSelector.value = false
 }
 
 const finishPractice = async () => {
@@ -278,6 +321,12 @@ const getTypeText = (type) => {
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .progress-info {
@@ -396,5 +445,82 @@ const getTypeText = (type) => {
   padding: 30px;
   background: white;
   border-radius: 12px;
+}
+
+/* 题目选择器样式 */
+.question-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.question-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  border: 2px solid #e4e7ed;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s;
+}
+
+.question-item:hover {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.question-item.current {
+  border-color: #409eff;
+  background: #409eff;
+  color: white;
+  font-weight: bold;
+}
+
+.question-item.answered {
+  border-color: #67c23a;
+  background: #f0f9eb;
+}
+
+.question-item.correct {
+  border-color: #67c23a;
+  background: #f0f9eb;
+}
+
+.question-item.wrong {
+  border-color: #f56c6c;
+  background: #fef0f0;
+}
+
+.question-item.correct .question-status {
+  background: #67c23a;
+}
+
+.question-item.wrong .question-status {
+  background: #f56c6c;
+}
+
+.question-number {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.question-status {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #67c23a;
+  color: white;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

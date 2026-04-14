@@ -56,6 +56,11 @@ const activeMenu = computed(() => route.path)
   background: var(--sidebar);
   border-right: 1px solid var(--sidebar-border);
   transition: width 0.3s;
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .collapse-btn {

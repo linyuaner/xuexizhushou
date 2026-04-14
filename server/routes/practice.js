@@ -22,6 +22,61 @@ router.post('/sessions', authenticateToken, (req, res) => {
       });
     }
 
+    // 检查是否有未完成的顺序练习会话
+    let existingSession = null;
+    if (practice_type === 'sequential' || practice_type === 'all_sequential') {
+      existingSession = db.prepare(`
+        SELECT * FROM practice_history 
+        WHERE user_id = ? 
+        AND practice_type = ? 
+        AND bank_id ${bank_id ? '= ?' : 'IS NULL'} 
+        AND is_completed = 0 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `).get(userId, practice_type, ...(bank_id ? [bank_id] : []));
+      
+      if (existingSession) {
+        console.log('🔄 找到未完成的练习会话:', existingSession.id);
+        
+        // 获取完整的题目列表（根据练习类型重新获取）
+        let questions;
+        let query;
+        
+        if (practice_type === 'sequential') {
+          if (bank_id) {
+            query = `
+              SELECT q.id FROM questions q
+              JOIN bank_questions bq ON q.id = bq.question_id
+              WHERE bq.bank_id = ?
+              ORDER BY bq.created_at
+              LIMIT ?
+            `;
+            questions = db.prepare(query).all(bank_id, total_questions);
+          } else {
+            query = `SELECT id FROM questions ORDER BY created_at LIMIT ?`;
+            questions = db.prepare(query).all(total_questions);
+          }
+        } else if (practice_type === 'all_sequential') {
+          query = `SELECT id FROM questions ORDER BY created_at LIMIT ?`;
+          questions = db.prepare(query).all(total_questions);
+        }
+        
+        const questionIds = questions.map(q => q.id);
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            session_id: existingSession.id,
+            question_ids: questionIds,
+            total_questions: questionIds.length,
+            settings,
+            current_index: existingSession.current_question_index
+          },
+          message: '继续未完成的练习'
+        });
+      }
+    }
+
     // 获取题库中的题目
     let questions;
     let query;
@@ -76,18 +131,61 @@ router.post('/sessions', authenticateToken, (req, res) => {
 
       case 'exam':
         // 模拟考试（从指定题库）
-        if (bank_id) {
-          query = `
-            SELECT q.id FROM questions q
-            JOIN bank_questions bq ON q.id = bq.question_id
-            WHERE bq.bank_id = ?
-            ORDER BY RANDOM()
-            LIMIT ?
-          `;
-          questions = db.prepare(query).all(bank_id, total_questions);
+        const questionDistribution = settings?.question_distribution;
+        if (questionDistribution) {
+          // 按照题目类型分布选择题目
+          questions = [];
+          
+          // 定义题目类型映射
+          const typeMap = {
+            single: 'single',
+            multiple: 'multiple',
+            truefalse: 'truefalse'
+          };
+          
+          // 为每种类型选择题目
+          for (const [type, count] of Object.entries(questionDistribution)) {
+            if (count > 0 && typeMap[type]) {
+              let typeQuery;
+              let typeQuestions;
+              
+              if (bank_id) {
+                typeQuery = `
+                  SELECT q.id FROM questions q
+                  JOIN bank_questions bq ON q.id = bq.question_id
+                  WHERE bq.bank_id = ? AND q.type = ?
+                  ORDER BY RANDOM()
+                  LIMIT ?
+                `;
+                typeQuestions = db.prepare(typeQuery).all(bank_id, typeMap[type], count);
+              } else {
+                typeQuery = `
+                  SELECT id FROM questions 
+                  WHERE type = ?
+                  ORDER BY RANDOM()
+                  LIMIT ?
+                `;
+                typeQuestions = db.prepare(typeQuery).all(typeMap[type], count);
+              }
+              
+              questions = [...questions, ...typeQuestions];
+            }
+          }
         } else {
-          query = `SELECT id FROM questions ORDER BY RANDOM() LIMIT ?`;
-          questions = db.prepare(query).all(total_questions);
+          // 没有指定分布，使用默认随机选择
+          if (bank_id) {
+            query = `
+              SELECT q.id FROM questions q
+              JOIN bank_questions bq ON q.id = bq.question_id
+              WHERE bq.bank_id = ?
+              ORDER BY RANDOM()
+              LIMIT ?
+            `;
+            questions = db.prepare(query).all(bank_id, total_questions);
+          } else {
+            query = `SELECT id FROM questions ORDER BY RANDOM() LIMIT ?`;
+            questions = db.prepare(query).all(total_questions);
+          }
         }
         break;
 
@@ -146,8 +244,8 @@ router.post('/sessions', authenticateToken, (req, res) => {
     // 创建练习会话
     const sessionId = randomUUID();
     db.prepare(`
-      INSERT INTO practice_history (id, user_id, bank_id, practice_type, total_questions, start_time, is_completed)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 0)
+      INSERT INTO practice_history (id, user_id, bank_id, practice_type, total_questions, start_time, is_completed, current_question_index)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 0, 0)
     `).run(sessionId, userId, bank_id || null, practice_type, questions.length);
 
     res.status(201).json({
@@ -156,7 +254,8 @@ router.post('/sessions', authenticateToken, (req, res) => {
         session_id: sessionId,
         question_ids: questions.map(q => q.id),
         total_questions: questions.length,
-        settings
+        settings,
+        current_index: 0
       },
       message: '练习会话创建成功'
     });

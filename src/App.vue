@@ -48,7 +48,9 @@ html, body, #app {
 
 .app-main {
   display: flex;
-  min-height: calc(100vh - 64px);
+  height: auto;
+  min-height: 100%;
+  align-items: stretch;
 }
 
 .main-content {

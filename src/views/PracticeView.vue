@@ -113,16 +113,35 @@ const loadBanks = async () => {
 const quickPractice = async (mode) => {
   try {
     let practiceType = mode
+    let totalQuestions = 10
+    let settings = {}
+    
     if (mode === 'all_random') {
       practiceType = 'all_random'
     } else if (mode === 'all_sequential') {
       practiceType = 'all_sequential'
+      // 获取题目总数
+      const totalRes = await api.get('/questions', { page: 1, limit: 1 })
+      totalQuestions = totalRes.total || 1000
+    } else if (mode === 'exam') {
+      // 模拟考试规则：60分钟，50道题
+      practiceType = 'exam'
+      totalQuestions = 50
+      settings = {
+        time_limit: 3600, // 60分钟，单位秒
+        question_distribution: {
+          single: 30,  // 30道单选题
+          multiple: 10, // 10道多选题
+          truefalse: 10 // 10道判断题
+        }
+      }
     }
     
     const res = await api.post('/practice/sessions', {
       bank_id: null,  // 不指定题库，练习所有题目
       practice_type: practiceType,
-      total_questions: 10
+      total_questions: totalQuestions,
+      settings: settings
     })
     
     router.push({
@@ -130,7 +149,9 @@ const quickPractice = async (mode) => {
       query: {
         session_id: res.data.session_id,
         questions: JSON.stringify(res.data.question_ids),
-        type: practiceType
+        type: practiceType,
+        settings: JSON.stringify(settings),
+        start_index: res.data.current_index || 0
       }
     })
   } catch (error) {
@@ -147,10 +168,31 @@ const selectMode = async (mode) => {
   showModeDialog.value = false
   
   try {
+    let totalQuestions = 10
+    let settings = {}
+    
+    if (mode === 'sequential') {
+      // 获取指定题库的题目总数
+      const bankRes = await api.get(`/banks/${selectedBankId.value}`)
+      totalQuestions = bankRes.data.question_count || 1000
+    } else if (mode === 'exam') {
+      // 模拟考试规则：60分钟，50道题
+      totalQuestions = 50
+      settings = {
+        time_limit: 3600, // 60分钟，单位秒
+        question_distribution: {
+          single: 30,  // 30道单选题
+          multiple: 10, // 10道多选题
+          truefalse: 10 // 10道判断题
+        }
+      }
+    }
+    
     const res = await api.post('/practice/sessions', {
       bank_id: selectedBankId.value,
       practice_type: mode,
-      total_questions: 10
+      total_questions: totalQuestions,
+      settings: settings
     })
     
     router.push({
@@ -158,7 +200,9 @@ const selectMode = async (mode) => {
       query: {
         session_id: res.data.session_id,
         questions: JSON.stringify(res.data.question_ids),
-        type: mode
+        type: mode,
+        settings: JSON.stringify(settings),
+        start_index: res.data.current_index || 0
       }
     })
   } catch (error) {

@@ -65,6 +65,8 @@ jobs:
 
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
 
       # 登录 Docker Hub（必须配置 secrets）
       - name: 登录 Docker Hub

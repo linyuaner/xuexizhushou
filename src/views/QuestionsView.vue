@@ -149,13 +149,16 @@ const viewQuestion = async (question, index) => {
       total_questions: total.value
     })
     
+    // 找到点击的题目在返回的题目列表中的索引
+    const questionIndex = Math.max(0, res.data.question_ids.indexOf(question.id))
+    
     router.push({
       name: 'PracticeSession',
       query: {
         session_id: res.data.session_id,
         questions: JSON.stringify(res.data.question_ids),
         type: 'all_sequential',
-        start_index: index
+        start_index: questionIndex
       }
     })
   } catch (error) {

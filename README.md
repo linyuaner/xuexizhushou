@@ -125,9 +125,11 @@ npm run dev
 ## API接口
 
 ### 认证接口
-- `POST /api/auth/register` - 用户注册
-- `POST /api/auth/login` - 用户登录
+- `POST /api/auth/register` - 用户注册（已禁用）
+- `POST /api/auth/login` - 用户登录（使用username和password）
 - `GET /api/auth/me` - 获取当前用户
+- `PUT /api/auth/profile` - 更新用户信息
+- `PUT /api/auth/password` - 修改密码
 
 ### 题目接口
 - `GET /api/questions` - 获取题目列表
@@ -167,7 +169,7 @@ npm run dev
 
 ## 使用说明
 
-1. **注册账号**: 点击注册按钮创建新账号
+1. **登录账号**: 点击登录按钮使用现有账号登录（注册功能已禁用）
 2. **浏览题目**: 在题目页面查看所有题目，支持筛选和搜索
 3. **开始练习**: 选择题库和练习模式开始刷题
 4. **查看统计**: 在个人中心查看学习数据和进度
