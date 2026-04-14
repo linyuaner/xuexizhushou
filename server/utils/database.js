@@ -34,8 +34,6 @@ function createTables() {
     )
   `);
 
-
-
   // 分类表
   db.run(`
     CREATE TABLE IF NOT EXISTS categories (
