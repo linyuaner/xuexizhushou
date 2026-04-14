@@ -111,6 +111,7 @@ function createTables() {
       duration INTEGER DEFAULT 0,
       is_completed INTEGER DEFAULT 0,
       current_question_index INTEGER DEFAULT 0,
+      questions_json TEXT, -- 存储题目ID列表的JSON字符串
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (bank_id) REFERENCES question_banks(id)

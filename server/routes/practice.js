@@ -22,9 +22,9 @@ router.post('/sessions', authenticateToken, (req, res) => {
       });
     }
 
-    // 检查是否有未完成的顺序练习会话
+    // 检查是否有未完成的练习会话
     let existingSession = null;
-    if (practice_type === 'sequential' || practice_type === 'all_sequential') {
+    if (practice_type === 'sequential' || practice_type === 'all_sequential' || practice_type === 'random' || practice_type === 'all_random' || practice_type === 'exam') {
       existingSession = db.prepare(`
         SELECT * FROM practice_history 
         WHERE user_id = ? 
@@ -35,33 +35,11 @@ router.post('/sessions', authenticateToken, (req, res) => {
         LIMIT 1
       `).get(userId, practice_type, ...(bank_id ? [bank_id] : []));
       
-      if (existingSession) {
+      if (existingSession && existingSession.questions_json) {
         console.log('🔄 找到未完成的练习会话:', existingSession.id);
         
-        // 获取完整的题目列表（根据练习类型重新获取）
-        let questions;
-        let query;
-        
-        if (practice_type === 'sequential') {
-          if (bank_id) {
-            query = `
-              SELECT q.id FROM questions q
-              JOIN bank_questions bq ON q.id = bq.question_id
-              WHERE bq.bank_id = ?
-              ORDER BY bq.created_at
-              LIMIT ?
-            `;
-            questions = db.prepare(query).all(bank_id, total_questions);
-          } else {
-            query = `SELECT id FROM questions ORDER BY created_at LIMIT ?`;
-            questions = db.prepare(query).all(total_questions);
-          }
-        } else if (practice_type === 'all_sequential') {
-          query = `SELECT id FROM questions ORDER BY created_at LIMIT ?`;
-          questions = db.prepare(query).all(total_questions);
-        }
-        
-        const questionIds = questions.map(q => q.id);
+        // 使用存储的题目ID列表
+        const questionIds = JSON.parse(existingSession.questions_json);
         
         return res.status(200).json({
           success: true,
@@ -243,16 +221,17 @@ router.post('/sessions', authenticateToken, (req, res) => {
 
     // 创建练习会话
     const sessionId = randomUUID();
+    const questionIds = questions.map(q => q.id);
     db.prepare(`
-      INSERT INTO practice_history (id, user_id, bank_id, practice_type, total_questions, start_time, is_completed, current_question_index)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 0, 0)
-    `).run(sessionId, userId, bank_id || null, practice_type, questions.length);
+      INSERT INTO practice_history (id, user_id, bank_id, practice_type, total_questions, questions_json, start_time, is_completed, current_question_index)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 0, 0)
+    `).run(sessionId, userId, bank_id || null, practice_type, questions.length, JSON.stringify(questionIds));
 
     res.status(201).json({
       success: true,
       data: {
         session_id: sessionId,
-        question_ids: questions.map(q => q.id),
+        question_ids: questionIds,
         total_questions: questions.length,
         settings,
         current_index: 0
