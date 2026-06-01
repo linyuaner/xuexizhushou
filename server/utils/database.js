@@ -201,11 +201,9 @@ const dbHelper = {
   prepare(sql) {
     return {
       run: (...params) => {
-        console.log('执行 SQL:', sql.substring(0, 50) + '...');
-        console.log('参数:', params);
+        // 移除日志输出，提高性能
         db.run(sql, params);
-        saveDatabase();
-        console.log('数据库已保存');
+        // 不立即保存，只在所有操作完成后保存一次
         return { lastInsertRowid: db.exec('SELECT last_insert_rowid()')[0]?.values[0][0] };
       },
       get: (...params) => {
@@ -228,6 +226,10 @@ const dbHelper = {
         });
       }
     };
+  },
+  // 添加保存方法，供外部调用
+  save: () => {
+    saveDatabase();
   }
 };
 

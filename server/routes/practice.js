@@ -95,6 +95,38 @@ router.post('/sessions', authenticateToken, (req, res) => {
         }
         break;
 
+      case 'category':
+        // 分类练习
+        const categoryId = settings?.category_id;
+        if (!categoryId) {
+          return res.status(400).json({
+            success: false,
+            message: '分类练习需要指定分类ID'
+          });
+        }
+        
+        if (bank_id) {
+          // 从指定题库的特定分类中选择题目
+          query = `
+            SELECT q.id FROM questions q
+            JOIN bank_questions bq ON q.id = bq.question_id
+            WHERE bq.bank_id = ? AND q.category_id = ?
+            ORDER BY RANDOM()
+            LIMIT ?
+          `;
+          questions = db.prepare(query).all(bank_id, categoryId, total_questions);
+        } else {
+          // 从所有题目的特定分类中选择题目
+          query = `
+            SELECT id FROM questions 
+            WHERE category_id = ?
+            ORDER BY RANDOM()
+            LIMIT ?
+          `;
+          questions = db.prepare(query).all(categoryId, total_questions);
+        }
+        break;
+
       case 'all_random':
         // 从所有题目中随机练习
         query = `SELECT id FROM questions ORDER BY RANDOM() LIMIT ?`;

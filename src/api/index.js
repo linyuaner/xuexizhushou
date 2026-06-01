@@ -7,7 +7,7 @@ const baseURL = '/api'
 
 const instance = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 300000, // 5分钟超时，适合大文件上传
   headers: {
     'Content-Type': 'application/json'
   }
@@ -82,11 +82,64 @@ export default {
   },
 
   // 上传文件
-  upload(url, formData) {
-    return instance.post(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+  upload(url, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      
+      // 添加 token
+      const token = localStorage.getItem('token')
+      
+      xhr.open('POST', `/api${url}`, true)
+      
+      // 设置请求头
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       }
+      
+      // 监听上传进度
+      const progressHandler = (event) => {
+        if (event.lengthComputable) {
+          const percentCompleted = Math.round((event.loaded * 100) / event.total)
+          console.log('XHR上传进度:', percentCompleted, '%')
+          if (onProgress) {
+            // 确保在主线程中更新进度
+            setTimeout(() => {
+              onProgress(percentCompleted)
+            }, 0)
+          }
+        }
+      }
+      
+      xhr.upload.addEventListener('progress', progressHandler)
+      
+      // 监听完成
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText)
+            resolve(response)
+          } catch (e) {
+            resolve(xhr.responseText)
+          }
+        } else {
+          reject(new Error(`上传失败: ${xhr.status}`))
+        }
+      })
+      
+      // 监听错误
+      xhr.addEventListener('error', () => {
+        reject(new Error('网络错误'))
+      })
+      
+      // 监听超时
+      xhr.timeout = 300000 // 5分钟
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('上传超时'))
+      })
+      
+      // 发送请求
+      console.log('开始发送上传请求')
+      xhr.send(formData)
     })
   }
 }

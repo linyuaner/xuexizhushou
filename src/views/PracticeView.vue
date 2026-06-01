@@ -75,6 +75,23 @@
           <h4>易错题</h4>
           <p>练习错误率高的题目</p>
         </div>
+        <div class="mode-card" @click="selectMode('category')">
+          <el-icon :size="40"><Grid /></el-icon>
+          <h4>分类练习</h4>
+          <p>按题目分类进行练习</p>
+        </div>
+      </div>
+    </el-dialog>
+
+    <el-dialog v-model="showCategoryDialog" title="选择分类" width="500px">
+      <div v-loading="loadingCategories" class="category-list">
+        <div v-if="categories.length === 0 && !loadingCategories" class="empty">
+          <el-empty description="暂无分类" />
+        </div>
+        <div v-for="category in categories" :key="category.id" class="category-card" @click="selectCategory(category.id, category.name)">
+          <h4>{{ category.name }}</h4>
+          <p v-if="category.description">{{ category.description }}</p>
+        </div>
       </div>
     </el-dialog>
   </div>
@@ -83,7 +100,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Document, User, Rank, RefreshRight, Timer, Warning, Star, Aim } from '@element-plus/icons-vue'
+import { Document, User, Rank, RefreshRight, Timer, Warning, Star, Aim, Grid } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api'
 
@@ -92,6 +109,11 @@ const loading = ref(false)
 const banks = ref([])
 const showModeDialog = ref(false)
 const selectedBankId = ref(null)
+const showCategoryDialog = ref(false)
+const loadingCategories = ref(false)
+const categories = ref([])
+const selectedCategoryId = ref(null)
+const selectedCategoryName = ref('')
 
 onMounted(() => {
   loadBanks()
@@ -106,6 +128,23 @@ const loadBanks = async () => {
     console.error('获取题库列表失败', error)
   } finally {
     loading.value = false
+  }
+}
+
+const loadCategories = async () => {
+  loadingCategories.value = true
+  try {
+    let res
+    if (selectedBankId.value) {
+      res = await api.get(`/banks/${selectedBankId.value}/categories`)
+    } else {
+      res = await api.get('/questions/categories/list')
+    }
+    categories.value = res.data
+  } catch (error) {
+    console.error('获取分类列表失败', error)
+  } finally {
+    loadingCategories.value = false
   }
 }
 
@@ -167,6 +206,13 @@ const startPractice = (bankId) => {
 const selectMode = async (mode) => {
   showModeDialog.value = false
   
+  if (mode === 'category') {
+    // 加载分类列表并显示分类选择对话框
+    await loadCategories()
+    showCategoryDialog.value = true
+    return
+  }
+  
   try {
     let totalQuestions = 10
     let settings = {}
@@ -207,6 +253,39 @@ const selectMode = async (mode) => {
     })
   } catch (error) {
     ElMessage.error(error.message || '创建练习失败')
+  }
+}
+
+const selectCategory = async (categoryId, categoryName) => {
+  showCategoryDialog.value = false
+  selectedCategoryId.value = categoryId
+  selectedCategoryName.value = categoryName
+  
+  try {
+    const totalQuestions = 10
+    const settings = {
+      category_id: categoryId
+    }
+    
+    const res = await api.post('/practice/sessions', {
+      bank_id: selectedBankId.value,
+      practice_type: 'category',
+      total_questions: totalQuestions,
+      settings: settings
+    })
+    
+    router.push({
+      name: 'PracticeSession',
+      query: {
+        session_id: res.data.session_id,
+        questions: JSON.stringify(res.data.question_ids),
+        type: 'category',
+        settings: JSON.stringify(settings),
+        start_index: res.data.current_index || 0
+      }
+    })
+  } catch (error) {
+    ElMessage.error(error.message || '创建分类练习失败')
   }
 }
 </script>
@@ -332,8 +411,42 @@ const selectMode = async (mode) => {
   padding: 60px 0;
 }
 
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.category-card {
+  padding: 16px;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.category-card:hover {
+  border-color: #409eff;
+  background: #f0f7ff;
+}
+
+.category-card h4 {
+  margin: 0 0 4px;
+  color: #333;
+}
+
+.category-card p {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
   .quick-start {
+    grid-template-columns: 1fr;
+  }
+  
+  .mode-grid {
     grid-template-columns: 1fr;
   }
 }

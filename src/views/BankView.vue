@@ -72,6 +72,7 @@
         :limit="1"
         accept=".xlsx,.xls"
         :on-change="handleFileChange"
+        :file-list="fileList"
       >
         <el-icon class="upload-icon"><UploadFilled /></el-icon>
         <div>将文件拖到此处，或<em>点击上传</em></div>
@@ -79,9 +80,13 @@
           <div class="upload-tip">请使用 Excel 保存为 .xlsx 格式（不要用CSV格式）</div>
         </template>
       </el-upload>
+      <div v-if="uploadProgress > 0 && uploadProgress < 100" class="upload-progress">
+        <el-progress :percentage="uploadProgress" :status="'success'" />
+        <div class="progress-text">上传中... {{ uploadProgress }}%</div>
+      </div>
       <template #footer>
-        <el-button @click="showImportDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitImport" :loading="importing">导入</el-button>
+        <el-button @click="showImportDialog = false" :disabled="uploading">取消</el-button>
+        <el-button type="primary" @click="submitImport" :loading="uploading">导入</el-button>
       </template>
     </el-dialog>
   </div>
@@ -101,10 +106,13 @@ const showCreateDialog = ref(false)
 const showImportDialog = ref(false)
 const creating = ref(false)
 const importing = ref(false)
+const uploading = ref(false)
 const createFormRef = ref()
 const uploadRef = ref()
 const importFile = ref(null)
 const currentImportBankId = ref(null)
+const uploadProgress = ref(0)
+const fileList = ref([])
 
 const createForm = reactive({
   name: '',
@@ -159,8 +167,9 @@ const importQuestions = (bankId) => {
   showImportDialog.value = true
 }
 
-const handleFileChange = (file) => {
+const handleFileChange = (file, fileListParam) => {
   importFile.value = file.raw
+  fileList.value = fileListParam
 }
 
 const submitImport = async () => {
@@ -169,20 +178,30 @@ const submitImport = async () => {
     return
   }
 
-  importing.value = true
+  uploading.value = true
+  uploadProgress.value = 0
   try {
+    console.log('开始上传文件:', importFile.value.name, importFile.value.size)
     const formData = new FormData()
     formData.append('file', importFile.value)
     
-    await api.upload(`/banks/${currentImportBankId.value}/import`, formData)
+    await api.upload(`/banks/${currentImportBankId.value}/import`, formData, (progress) => {
+      console.log('收到进度:', progress)
+      // 强制更新响应式变量
+      uploadProgress.value = progress
+    })
+    console.log('上传完成')
     ElMessage.success('导入成功')
     showImportDialog.value = false
     uploadRef.value.clearFiles()
+    uploadProgress.value = 0
     loadBanks()
   } catch (error) {
+    console.error('上传失败:', error)
     ElMessage.error(error.message || '导入失败')
   } finally {
-    importing.value = false
+    uploading.value = false
+    uploadProgress.value = 0
   }
 }
 
@@ -271,6 +290,20 @@ const deleteBank = async (bank) => {
   margin-top: 12px;
   color: #909399;
   font-size: 13px;
+}
+
+.upload-progress {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+}
+
+.progress-text {
+  text-align: center;
+  margin-top: 8px;
+  color: #606266;
+  font-size: 14px;
 }
 
 .empty {

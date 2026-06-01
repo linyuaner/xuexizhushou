@@ -286,6 +286,41 @@ router.get('/:id/questions', optionalAuth, (req, res) => {
   }
 });
 
+// 获取题库中的分类列表
+router.get('/:id/categories', optionalAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const bank = db.prepare('SELECT * FROM question_banks WHERE id = ?').get(id);
+    if (!bank) {
+      return res.status(404).json({
+        success: false,
+        message: '题库不存在'
+      });
+    }
+
+    const categories = db.prepare(`
+      SELECT DISTINCT c.id, c.name, c.description
+      FROM categories c
+      JOIN questions q ON q.category_id = c.id
+      JOIN bank_questions bq ON q.id = bq.question_id
+      WHERE bq.bank_id = ? AND q.category_id IS NOT NULL
+      ORDER BY c.name
+    `).all(id);
+
+    res.json({
+      success: true,
+      data: categories
+    });
+  } catch (error) {
+    console.error('获取题库分类失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取题库分类失败'
+    });
+  }
+});
+
 // 添加题目到题库
 router.post('/:id/questions', authenticateToken, (req, res) => {
   try {
@@ -487,6 +522,7 @@ router.post('/:id/import', authenticateToken, upload.single('file'), (req, res) 
     let importedCount = 0;
     let errorCount = 0;
     const errors = [];
+    const categoryCache = new Map();
 
     console.log('开始解析 Excel，共', data.length - 1, '行数据');
 
@@ -554,21 +590,25 @@ router.post('/:id/import', authenticateToken, upload.single('file'), (req, res) 
           answer = { selected: answerStr.trim().toUpperCase() || 'A' };
         }
 
-        // 查找或创建分类
+        // 查找或创建分类（使用缓存）
         let categoryId = null;
         if (categoryName) {
-          const existingCategory = db.prepare('SELECT id FROM categories WHERE name = ?').get(categoryName);
-          if (existingCategory) {
-            categoryId = existingCategory.id;
+          if (categoryCache.has(categoryName)) {
+            categoryId = categoryCache.get(categoryName);
           } else {
-            categoryId = randomUUID();
-            db.prepare('INSERT INTO categories (id, name) VALUES (?, ?)').run(categoryId, categoryName);
+            const existingCategory = db.prepare('SELECT id FROM categories WHERE name = ?').get(categoryName);
+            if (existingCategory) {
+              categoryId = existingCategory.id;
+            } else {
+              categoryId = randomUUID();
+              db.prepare('INSERT INTO categories (id, name) VALUES (?, ?)').run(categoryId, categoryName);
+            }
+            categoryCache.set(categoryName, categoryId);
           }
         }
 
         // 创建题目
         const questionId = randomUUID();
-        console.log('插入题目:', { questionId, title: title.substring(0, 20), type, difficulty });
         
         db.prepare(`
           INSERT INTO questions (id, user_id, title, content, type, difficulty, options, answer, explanation, category_id, created_at)
@@ -593,6 +633,9 @@ router.post('/:id/import', authenticateToken, upload.single('file'), (req, res) 
     const count = db.prepare('SELECT COUNT(*) as count FROM bank_questions WHERE bank_id = ?').get(id);
     db.prepare('UPDATE question_banks SET question_count = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .run(count.count, id);
+
+    // 保存数据库（只保存一次，提高性能）
+    db.save();
 
     // 删除上传的文件
     fs.unlinkSync(req.file.path);
