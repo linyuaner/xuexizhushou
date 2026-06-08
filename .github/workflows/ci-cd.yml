@@ -16,25 +16,6 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      bump_type:
-        description: '版本递增类型'
-        required: false
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-      custom_version:
-        description: '自定义版本号（留空则自动递增）'
-        required: false
-        type: string
-      push_docker:
-        description: '是否推送 Docker 镜像'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -53,12 +34,12 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────
-  # Job 1: 版本号管理
+  # Job 1: 版本号管理（仅推送代码时）
   # ─────────────────────────────────────────────
   version:
     name: 版本管理
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push'
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
     steps:
@@ -71,16 +52,9 @@ jobs:
         id: version
         run: |
           chmod +x scripts/bump-version.sh
-          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
-            ./scripts/bump-version.sh "${{ github.event.inputs.custom_version }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.bump_type }}" ]; then
-            ./scripts/bump-version.sh "${{ github.event.inputs.bump_type }}"
-          else
-            ./scripts/bump-version.sh patch
-          fi
+          ./scripts/bump-version.sh patch
 
       - name: 提交版本更新
-        if: github.event_name == 'push'
         run: |
           VERSION=$(cat VERSION)
           git config user.name "github-actions[bot]"
@@ -90,14 +64,12 @@ jobs:
           git push
 
       - name: 创建 Git Tag
-        if: github.event_name == 'push'
         run: |
           VERSION=$(cat VERSION)
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
 
       - name: 创建 GitHub Release
-        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.VERSION }}
@@ -230,7 +202,7 @@ jobs:
   docker-push:
     name: Docker 推送
     needs: [frontend-build, backend-check]
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push_docker == 'true'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -266,7 +238,6 @@ jobs:
             ${{ env.GHCR_IMAGE }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=raw,value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.version != '' }}
             type=sha,prefix=sha-,format=short
 
       - name: 构建并推送
