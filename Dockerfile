@@ -26,7 +26,7 @@ WORKDIR /app
 # 复用上一阶段的 node_modules
 COPY --from=frontend-deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
-COPY vite.config.js uno.config.ts ./
+COPY vite.config.ts uno.config.ts ./
 COPY src/ ./src/
 COPY index.html ./
 

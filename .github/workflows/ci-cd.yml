@@ -70,6 +70,7 @@ jobs:
       - name: 设置版本号
         id: version
         run: |
+          chmod +x scripts/bump-version.sh
           if [ -n "${{ github.event.inputs.custom_version }}" ]; then
             ./scripts/bump-version.sh "${{ github.event.inputs.custom_version }}"
           elif [ -n "${{ github.event.inputs.bump_type }}" ]; then
