@@ -30,8 +30,8 @@ COPY vite.config.ts uno.config.ts ./
 COPY src/ ./src/
 COPY index.html ./
 
-# 构建静态产物
-RUN npm run build
+# 构建静态产物（跳过 vue-tsc，CI 已做类型检查）
+RUN npx vite build
 
 # ─────────────────────────────────────────────
 # Stage 3: 后端依赖安装（生产 + 开发依赖用于编译）
