@@ -9,8 +9,8 @@ services:
       dockerfile: Dockerfile
       # 利用 BuildKit 缓存加速重复构建
       cache_from:
-        - jqlshr/study-helper:latest
-    image: jqlshr/study-helper:latest
+        - linyuaner/xuexizhushou:latest
+    image: linyuaner/xuexizhushou:latest
     container_name: study-helper-app
     restart: unless-stopped
     ports:
@@ -18,7 +18,12 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # JWT 密钥：系统会自动生成安全的随机密钥
+      # JWT 密钥（生产环境必须设置）
+      - JWT_SECRET=${JWT_SECRET:-}
+      # 热更新配置
+      - ENABLE_HOT_UPDATE=true
+      - HOT_UPDATE_INTERVAL=300
+      - GITHUB_REPO=linyuaner/xuexizhushou
     volumes:
       # 数据持久化：SQLite 数据库文件
       - quiz-data:/app/server/data
@@ -28,7 +33,7 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
-      start_period: 15s
+      start_period: 30s
       retries: 3
     logging:
       driver: "json-file"

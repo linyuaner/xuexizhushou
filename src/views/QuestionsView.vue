@@ -41,7 +41,9 @@
           <span class="category" v-if="question.category_name">{{ question.category_name }}</span>
         </div>
         <h3 class="question-title">{{ question.title }}</h3>
-        <p class="question-content">{{ question.content }}</p>
+        <p class="question-content" v-if="question.content && question.content !== question.title">
+          {{ question.content }}
+        </p>
         <div class="question-footer">
           <span class="date">{{ formatDate(question.created_at) }}</span>
           <el-button text size="small" @click.stop="viewQuestion(question, index)">开始练习</el-button>
@@ -156,7 +158,6 @@ const viewQuestion = async (question, index) => {
       name: 'PracticeSession',
       query: {
         session_id: res.data.session_id,
-        questions: JSON.stringify(res.data.question_ids),
         type: 'all_sequential',
         start_index: questionIndex
       }

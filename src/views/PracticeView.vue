@@ -187,7 +187,6 @@ const quickPractice = async (mode) => {
       name: 'PracticeSession',
       query: {
         session_id: res.data.session_id,
-        questions: JSON.stringify(res.data.question_ids),
         type: practiceType,
         settings: JSON.stringify(settings),
         start_index: res.data.current_index || 0
@@ -245,7 +244,6 @@ const selectMode = async (mode) => {
       name: 'PracticeSession',
       query: {
         session_id: res.data.session_id,
-        questions: JSON.stringify(res.data.question_ids),
         type: mode,
         settings: JSON.stringify(settings),
         start_index: res.data.current_index || 0
@@ -278,7 +276,6 @@ const selectCategory = async (categoryId, categoryName) => {
       name: 'PracticeSession',
       query: {
         session_id: res.data.session_id,
-        questions: JSON.stringify(res.data.question_ids),
         type: 'category',
         settings: JSON.stringify(settings),
         start_index: res.data.current_index || 0

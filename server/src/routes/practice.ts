@@ -1,0 +1,623 @@
+import express from 'express'
+import { randomUUID } from 'crypto'
+import type { Request, Response } from 'express'
+import { getDatabase } from '../utils/database.js'
+import { authenticateToken } from '../middleware/auth.js'
+
+const router = express.Router()
+const db = getDatabase()
+
+interface CreateSessionBody {
+  bank_id?: string
+  practice_type?: string
+  total_questions?: number
+  settings?: {
+    category_id?: string
+    question_distribution?: Record<string, number>
+  }
+}
+
+interface SubmitAnswerBody {
+  session_id?: string
+  question_id?: string
+  answer?: any
+  time_spent?: number
+}
+
+router.post('/sessions', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { bank_id, practice_type, total_questions = 10, settings = {} } = req.body as CreateSessionBody
+    const userId = req.user?.userId
+
+    if (!practice_type) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择练习类型'
+      })
+    }
+
+    let existingSession: any = null
+    if (practice_type === 'sequential' || practice_type === 'all_sequential' || practice_type === 'random' || practice_type === 'all_random' || practice_type === 'exam') {
+      const sessionParams: any[] = [userId as string, practice_type]
+      let bankCondition = 'IS NULL'
+      
+      if (bank_id) {
+        bankCondition = '= ?'
+        sessionParams.push(bank_id)
+      }
+      
+      existingSession = db.prepare(`
+        SELECT id, questions_json, current_question_index FROM practice_history 
+        WHERE user_id = ? 
+        AND practice_type = ? 
+        AND bank_id ${bankCondition} 
+        AND is_completed = 0 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `).get(...sessionParams)
+      
+      if (existingSession && existingSession.questions_json) {
+        const questionIds = JSON.parse(existingSession.questions_json)
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            session_id: existingSession.id,
+            question_ids: questionIds,
+            total_questions: questionIds.length,
+            settings,
+            current_index: existingSession.current_question_index
+          },
+          message: '继续未完成的练习'
+        })
+      }
+    }
+
+    let questions: any[]
+    let query: string
+
+    switch (practice_type) {
+      case 'sequential':
+        if (bank_id) {
+          query = `
+            SELECT q.id FROM questions q
+            JOIN bank_questions bq ON q.id = bq.question_id
+            WHERE bq.bank_id = ?
+            ORDER BY bq.created_at
+            LIMIT ?
+          `
+          questions = db.prepare(query).all(bank_id, total_questions)
+        } else {
+          query = `SELECT id FROM questions ORDER BY created_at LIMIT ?`
+          questions = db.prepare(query).all(total_questions)
+        }
+        break
+
+      case 'random':
+        if (bank_id) {
+          query = `
+            SELECT q.id FROM questions q
+            JOIN bank_questions bq ON q.id = bq.question_id
+            WHERE bq.bank_id = ?
+            ORDER BY RANDOM()
+            LIMIT ?
+          `
+          questions = db.prepare(query).all(bank_id, total_questions)
+        } else {
+          query = `SELECT id FROM questions ORDER BY RANDOM() LIMIT ?`
+          questions = db.prepare(query).all(total_questions)
+        }
+        break
+
+      case 'category':
+        const categoryId = settings?.category_id
+        if (!categoryId) {
+          return res.status(400).json({
+            success: false,
+            message: '分类练习需要指定分类ID'
+          })
+        }
+        
+        if (bank_id) {
+          query = `
+            SELECT q.id FROM questions q
+            JOIN bank_questions bq ON q.id = bq.question_id
+            WHERE bq.bank_id = ? AND q.category_id = ?
+            ORDER BY RANDOM()
+            LIMIT ?
+          `
+          questions = db.prepare(query).all(bank_id, categoryId, total_questions)
+        } else {
+          query = `
+            SELECT id FROM questions 
+            WHERE category_id = ?
+            ORDER BY RANDOM()
+            LIMIT ?
+          `
+          questions = db.prepare(query).all(categoryId, total_questions)
+        }
+        break
+
+      case 'all_random':
+        query = `SELECT id FROM questions ORDER BY RANDOM() LIMIT ?`
+        questions = db.prepare(query).all(total_questions)
+        break
+
+      case 'all_sequential':
+        query = `SELECT id FROM questions ORDER BY created_at LIMIT ?`
+        questions = db.prepare(query).all(total_questions)
+        break
+
+      case 'exam':
+        const questionDistribution = settings?.question_distribution
+        if (questionDistribution) {
+          questions = []
+          
+          const typeMap: Record<string, string> = {
+            single: 'single',
+            multiple: 'multiple',
+            truefalse: 'truefalse'
+          }
+          
+          for (const [type, count] of Object.entries(questionDistribution)) {
+            if (count > 0 && typeMap[type]) {
+              let typeQuery: string
+              let typeQuestions: any[]
+              
+              if (bank_id) {
+                typeQuery = `
+                  SELECT q.id FROM questions q
+                  JOIN bank_questions bq ON q.id = bq.question_id
+                  WHERE bq.bank_id = ? AND q.type = ?
+                  ORDER BY RANDOM()
+                  LIMIT ?
+                `
+                typeQuestions = db.prepare(typeQuery).all(bank_id, typeMap[type], count)
+              } else {
+                typeQuery = `
+                  SELECT id FROM questions 
+                  WHERE type = ?
+                  ORDER BY RANDOM()
+                  LIMIT ?
+                `
+                typeQuestions = db.prepare(typeQuery).all(typeMap[type], count)
+              }
+              
+              questions = [...questions, ...typeQuestions]
+            }
+          }
+        } else {
+          if (bank_id) {
+            query = `
+              SELECT q.id FROM questions q
+              JOIN bank_questions bq ON q.id = bq.question_id
+              WHERE bq.bank_id = ?
+              ORDER BY RANDOM()
+              LIMIT ?
+            `
+            questions = db.prepare(query).all(bank_id, total_questions)
+          } else {
+            query = `SELECT id FROM questions ORDER BY RANDOM() LIMIT ?`
+            questions = db.prepare(query).all(total_questions)
+          }
+        }
+        break
+
+      case 'wrong':
+        query = `
+          SELECT DISTINCT q.id FROM questions q
+          JOIN user_answers ua ON q.id = ua.question_id
+          WHERE ua.user_id = ? AND ua.is_correct = 0
+          ORDER BY ua.created_at DESC
+          LIMIT ?
+        `
+        questions = db.prepare(query).all(userId, total_questions)
+        break
+
+      case 'easy_wrong':
+        query = `
+          SELECT qs.question_id as id FROM question_stats qs
+          JOIN questions q ON qs.question_id = q.id
+          WHERE qs.total_attempts >= 3
+          ORDER BY qs.error_rate DESC
+          LIMIT ?
+        `
+        questions = db.prepare(query).all(total_questions)
+        break
+
+      case 'favorite':
+        query = `
+          SELECT q.id FROM questions q
+          JOIN user_favorites uf ON q.id = uf.question_id
+          WHERE uf.user_id = ?
+          ORDER BY uf.created_at DESC
+          LIMIT ?
+        `
+        questions = db.prepare(query).all(userId, total_questions)
+        break
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: '无效的练习类型'
+        })
+    }
+
+    if (questions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '没有找到可练习的题目，请先添加题目'
+      })
+    }
+
+    const sessionId = randomUUID()
+    const questionIds = questions.map((q: any) => q.id)
+    db.prepare(`
+      INSERT INTO practice_history (id, user_id, bank_id, practice_type, total_questions, questions_json, start_time, is_completed, current_question_index)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 0, 0)
+    `).run(sessionId, userId, bank_id || null, practice_type, questions.length, JSON.stringify(questionIds))
+
+    res.status(201).json({
+      success: true,
+      data: {
+        session_id: sessionId,
+        question_ids: questionIds,
+        total_questions: questions.length,
+        settings,
+        current_index: 0
+      },
+      message: '练习会话创建成功'
+    })
+  } catch (error) {
+    console.error('创建练习会话失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '创建练习会话失败'
+    })
+  }
+})
+
+router.get('/sessions/:id', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user?.userId
+
+    const session = db.prepare(`
+      SELECT ph.*, qb.name as bank_name
+      FROM practice_history ph
+      LEFT JOIN question_banks qb ON ph.bank_id = qb.id
+      WHERE ph.id = ? AND ph.user_id = ?
+    `).get(id, userId)
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: '练习会话不存在'
+      })
+    }
+
+    res.json({
+      success: true,
+      data: session
+    })
+  } catch (error) {
+    console.error('获取练习会话失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取练习会话失败'
+    })
+  }
+})
+
+router.get('/sessions/:id/questions', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user?.userId
+
+    const session = db.prepare(`
+      SELECT questions_json FROM practice_history 
+      WHERE id = ? AND user_id = ?
+    `).get(id, userId)
+
+    if (!session || !session.questions_json) {
+      return res.status(404).json({
+        success: false,
+        message: '练习会话不存在或没有题目'
+      })
+    }
+
+    const questionIds = JSON.parse(session.questions_json)
+    const placeholders = questionIds.map(() => '?').join(',')
+    const questions = db.prepare(`
+      SELECT q.*, c.name as category_name
+      FROM questions q
+      LEFT JOIN categories c ON q.category_id = c.id
+      WHERE q.id IN (${placeholders})
+    `).all(...questionIds)
+
+    const questionMap = new Map()
+    questions.forEach((q: any) => {
+      questionMap.set(q.id, {
+        ...q,
+        options: q.options ? JSON.parse(q.options) : [],
+        answer: q.answer ? JSON.parse(q.answer) : null,
+        tags: q.tags ? JSON.parse(q.tags) : []
+      })
+    })
+
+    const orderedQuestions = questionIds.map((id: string) => questionMap.get(id)).filter(Boolean)
+
+    res.json({
+      success: true,
+      data: orderedQuestions
+    })
+  } catch (error) {
+    console.error('获取练习会话题目失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取练习会话题目失败'
+    })
+  }
+})
+
+router.post('/answers', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { session_id, question_id, answer, time_spent } = req.body as SubmitAnswerBody
+    const userId = req.user?.userId
+
+    if (!session_id || !question_id || answer === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少必要参数'
+      })
+    }
+
+    const question = db.prepare('SELECT id, type, answer FROM questions WHERE id = ?').get(question_id)
+    if (!question) {
+      return res.status(404).json({
+        success: false,
+        message: '题目不存在'
+      })
+    }
+
+    const correctAnswer = JSON.parse(question.answer)
+    let isCorrect: boolean | null = false
+
+    const normalizeAnswer = (ans: any): any[] => {
+      if (!ans) return []
+      if (Array.isArray(ans)) return ans
+      if (typeof ans === 'string') return ans.split(',').map((s: string) => s.trim())
+      return [ans]
+    }
+
+    if (question.type === 'single' || question.type === 'truefalse') {
+      const userAnswer = answer.selected
+      const correctKey = correctAnswer.selected
+      isCorrect = userAnswer === correctKey
+    } else if (question.type === 'multiple') {
+      const userAnswer = normalizeAnswer(answer.selected)
+      const correctKeys = normalizeAnswer(correctAnswer.selected)
+      
+      const userSet = new Set(userAnswer)
+      const correctSet = new Set(correctKeys)
+      isCorrect = userSet.size === correctSet.size && 
+                  [...userSet].every((x: any) => correctSet.has(x))
+    } else if (question.type === 'fill' || question.type === 'essay') {
+      isCorrect = null
+    }
+
+    const answerId = randomUUID()
+    db.prepare(`
+      INSERT INTO user_answers (id, user_id, question_id, answer, is_correct, practice_session_id, time_spent)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      answerId,
+      userId,
+      question_id,
+      JSON.stringify(answer),
+      isCorrect === null ? 0 : (isCorrect ? 1 : 0),
+      session_id,
+      time_spent || 0
+    )
+
+    db.prepare(`
+      UPDATE practice_history
+      SET current_question_index = current_question_index + 1
+      WHERE id = ?
+    `).run(session_id)
+
+    const existingStats = db.prepare(
+      'SELECT total_attempts, correct_count, incorrect_count, average_time FROM question_stats WHERE question_id = ?'
+    ).get(question_id)
+    if (existingStats) {
+      const newTotal = existingStats.total_attempts + 1
+      const newCorrect = existingStats.correct_count + (isCorrect ? 1 : 0)
+      const newIncorrect = existingStats.incorrect_count + (isCorrect === false ? 1 : 0)
+      const newAvgTime = ((existingStats.average_time * existingStats.total_attempts) + (time_spent || 0)) / newTotal
+
+      db.prepare(`
+        UPDATE question_stats SET
+          total_attempts = ?,
+          correct_count = ?,
+          incorrect_count = ?,
+          error_rate = ?,
+          average_time = ?
+        WHERE question_id = ?
+      `).run(newTotal, newCorrect, newIncorrect, newIncorrect / newTotal, newAvgTime, question_id)
+    } else {
+      db.prepare(`
+        INSERT INTO question_stats (id, question_id, total_attempts, correct_count, incorrect_count, error_rate, average_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        randomUUID(),
+        question_id,
+        1,
+        isCorrect ? 1 : 0,
+        isCorrect ? 0 : 1,
+        isCorrect ? 0 : 1,
+        time_spent || 0
+      )
+    }
+
+    res.json({
+      success: true,
+      data: {
+        is_correct: isCorrect,
+        correct_answer: correctAnswer
+      },
+      message: isCorrect ? '回答正确！' : '回答错误'
+    })
+  } catch (error) {
+    console.error('提交答案失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '提交答案失败'
+    })
+  }
+})
+
+router.post('/sessions/:id/complete', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user?.userId
+
+    const session = db.prepare(`
+      SELECT id, start_time FROM practice_history WHERE id = ? AND user_id = ?
+    `).get(id, userId)
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: '练习会话不存在'
+      })
+    }
+
+    const stats = db.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+      FROM user_answers
+      WHERE practice_session_id = ?
+    `).get(id)
+
+    const duration = session.start_time ? 
+      Math.floor((new Date().getTime() - new Date(session.start_time).getTime()) / 1000) : 0
+
+    db.prepare(`
+      UPDATE practice_history SET
+        correct_count = ?,
+        incorrect_count = ?,
+        end_time = CURRENT_TIMESTAMP,
+        duration = ?,
+        is_completed = 1
+      WHERE id = ?
+    `).run(stats?.correct || 0, (stats?.total || 0) - (stats?.correct || 0), duration, id)
+
+    res.json({
+      success: true,
+      data: {
+        total: stats?.total || 0,
+        correct: stats?.correct || 0,
+        incorrect: (stats?.total || 0) - (stats?.correct || 0),
+        correct_rate: stats?.total ? ((stats?.correct || 0) / stats.total * 100).toFixed(1) : 0,
+        duration
+      },
+      message: '练习完成'
+    })
+  } catch (error) {
+    console.error('完成练习会话失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '完成练习会话失败'
+    })
+  }
+})
+
+router.get('/history', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10, type } = req.query
+    const userId = req.user?.userId
+    const offset = (parseInt(String(page)) - 1) * parseInt(String(limit))
+
+    let whereClause = 'ph.user_id = ?'
+    const params: any[] = [userId]
+
+    if (type) {
+      whereClause += ' AND ph.practice_type = ?'
+      params.push(type)
+    }
+
+    const countResult = db.prepare(`
+      SELECT COUNT(*) as total FROM practice_history ph WHERE ${whereClause}
+    `).get(...params)
+
+    const history = db.prepare(`
+      SELECT ph.*, qb.name as bank_name
+      FROM practice_history ph
+      LEFT JOIN question_banks qb ON ph.bank_id = qb.id
+      WHERE ${whereClause}
+      ORDER BY ph.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, parseInt(String(limit)), offset)
+
+    res.json({
+      success: true,
+      data: history,
+      total: countResult?.total || 0,
+      page: parseInt(String(page)),
+      totalPages: Math.ceil((countResult?.total || 0) / parseInt(String(limit)))
+    })
+  } catch (error) {
+    console.error('获取练习历史失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取练习历史失败'
+    })
+  }
+})
+
+router.get('/wrong', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 20 } = req.query
+    const userId = req.user?.userId
+    const offset = (parseInt(String(page)) - 1) * parseInt(String(limit))
+
+    const countResult = db.prepare(`
+      SELECT COUNT(DISTINCT question_id) as total
+      FROM user_answers
+      WHERE user_id = ? AND is_correct = 0
+    `).get(userId)
+
+    const wrongQuestions = db.prepare(`
+      SELECT DISTINCT q.*, ua.created_at as wrong_time
+      FROM questions q
+      JOIN user_answers ua ON q.id = ua.question_id
+      WHERE ua.user_id = ? AND ua.is_correct = 0
+      ORDER BY ua.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(userId, parseInt(String(limit)), offset)
+
+    const questions = wrongQuestions.map((q: any) => ({
+      ...q,
+      options: q.options ? JSON.parse(q.options) : [],
+      answer: q.answer ? JSON.parse(q.answer) : null,
+      tags: q.tags ? JSON.parse(q.tags) : []
+    }))
+
+    res.json({
+      success: true,
+      data: questions,
+      total: countResult?.total || 0,
+      page: parseInt(String(page)),
+      totalPages: Math.ceil((countResult?.total || 0) / parseInt(String(limit)))
+    })
+  } catch (error) {
+    console.error('获取错题列表失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取错题列表失败'
+    })
+  }
+})
+
+export default router

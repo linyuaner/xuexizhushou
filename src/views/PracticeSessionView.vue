@@ -48,7 +48,9 @@
       </div>
       
       <h2 class="question-title">{{ currentQuestion.title }}</h2>
-      <p class="question-content">{{ currentQuestion.content }}</p>
+      <p class="question-content" v-if="currentQuestion.content && currentQuestion.content !== currentQuestion.title">
+        {{ currentQuestion.content }}
+      </p>
 
       <div class="options" v-if="currentQuestion.options && currentQuestion.options.length">
         <div 
@@ -116,13 +118,14 @@ const route = useRoute()
 const router = useRouter()
 
 const sessionId = ref(route.query.session_id)
-const questionIds = ref(JSON.parse(route.query.questions || '[]'))
+const questionIds = ref([])
 const practiceType = ref(route.query.type || 'sequential')
 const startIndex = ref(parseInt(route.query.start_index) || 0)
 const settings = ref(JSON.parse(route.query.settings || '{}'))
 
 const currentIndex = ref(startIndex.value)
 const currentQuestion = ref(null)
+const questionsCache = ref([]) // 缓存所有题目
 const selectedAnswer = ref(null)
 const textAnswer = ref('')
 const showResult = ref(false)
@@ -133,6 +136,7 @@ const isCompleted = ref(false)
 const showQuestionSelector = ref(false)
 const answeredQuestions = ref([])
 const questionResults = ref({}) // 存储题目的对错状态
+const loadingQuestions = ref(true)
 
 const progress = computed(() => {
   if (questionIds.value.length === 0) return 0
@@ -146,7 +150,24 @@ const hasAnswer = computed(() => {
   return selectedAnswer.value !== null
 })
 
-onMounted(() => {
+const loadAllQuestions = async () => {
+  if (!sessionId.value) return
+
+  loadingQuestions.value = true
+  try {
+    const res = await api.get(`/practice/sessions/${sessionId.value}/questions`)
+    questionsCache.value = res.data || []
+    questionIds.value = questionsCache.value.map(q => q.id)
+  } catch (error) {
+    console.error('加载题目失败', error)
+    ElMessage.error('加载题目失败')
+  } finally {
+    loadingQuestions.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadAllQuestions()
   loadCurrentQuestion()
   if (practiceType.value === 'exam') {
     startTimer()
@@ -170,17 +191,17 @@ const startTimer = () => {
   }, 1000)
 }
 
-const loadCurrentQuestion = async () => {
+const loadCurrentQuestion = () => {
   if (currentIndex.value >= questionIds.value.length) return
-  
-  try {
-    const res = await api.get(`/questions/${questionIds.value[currentIndex.value]}`)
-    currentQuestion.value = res.data
+
+  const currentId = questionIds.value[currentIndex.value]
+  const cachedQuestion = questionsCache.value.find(q => q.id === currentId)
+
+  if (cachedQuestion) {
+    currentQuestion.value = cachedQuestion
     selectedAnswer.value = null
     textAnswer.value = ''
     showResult.value = false
-  } catch (error) {
-    console.error('加载题目失败', error)
   }
 }
 

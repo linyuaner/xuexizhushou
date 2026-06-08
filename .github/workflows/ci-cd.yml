@@ -1,0 +1,290 @@
+# =============================================================================
+# CI/CD - 统一持续集成与部署工作流
+# 触发：
+#   - 推送到 main 分支：运行 CI 检查（前端构建 + 后端检查 + 测试 + Docker 验证）
+#   - 手动触发：可运行完整 CI/CD 流程（含 Docker 镜像推送）
+# =============================================================================
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '*.md'
+      - '.gitignore'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: '版本递增类型'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: '自定义版本号（留空则自动递增）'
+        required: false
+        type: string
+      push_docker:
+        description: '是否推送 Docker 镜像'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+
+# 同一个分支/PR 只保留最新一次运行
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+# 全局变量
+env:
+  DOCKERHUB_IMAGE: linyuaner/xuexizhushou
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: 版本号管理（仅手动触发时）
+  # ─────────────────────────────────────────────
+  version:
+    name: 版本管理
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 设置版本号
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
+            ./scripts/bump-version.sh "${{ github.event.inputs.custom_version }}"
+          elif [ -n "${{ github.event.inputs.bump_type }}" ]; then
+            ./scripts/bump-version.sh "${{ github.event.inputs.bump_type }}"
+          else
+            ./scripts/bump-version.sh patch
+          fi
+
+      - name: 提交版本更新
+        run: |
+          VERSION=$(cat VERSION)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION server/VERSION
+          git commit -m "chore: bump version to $VERSION [skip ci]" || echo "No changes to commit"
+          git push
+
+      - name: 创建 Git Tag
+        run: |
+          VERSION=$(cat VERSION)
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Release v${{ steps.version.outputs.VERSION }}
+          generate_release_notes: true
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────
+  # Job 2: 前端构建验证
+  # ─────────────────────────────────────────────
+  frontend-build:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: 安装依赖
+        run: npm ci --prefer-offline
+
+      - name: TypeScript 检查
+        run: npm run type-check
+
+      - name: 构建
+        run: npm run build
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 3
+
+      - name: 运行测试
+        run: npm test --if-present
+
+  # ─────────────────────────────────────────────
+  # Job 3: 后端构建验证
+  # ─────────────────────────────────────────────
+  backend-check:
+    name: 后端验证
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci --prefer-offline
+
+      - name: TypeScript 检查
+        run: npm run type-check
+
+      - name: 构建
+        run: npm run build
+
+      - name: 服务器启动验证
+        run: |
+          timeout 5 node dist/index.js || \
+          [ $? -eq 124 ] && echo "✅ 服务器可正常启动"
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci-test-secret-key
+          PORT: 13000
+
+  # ─────────────────────────────────────────────
+  # Job 4: Docker 构建验证（PR 或推送时，不推送）
+  # ─────────────────────────────────────────────
+  docker-build-check:
+    name: Docker 构建验证
+    runs-on: ubuntu-latest
+    needs: [frontend-build, backend-check]
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 构建 Docker 镜像（验证）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: study-helper:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 容器健康检查
+        run: |
+          docker run -d --name study-helper-ci -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e JWT_SECRET=ci-health-check-secret \
+            study-helper:ci-test
+
+          echo "等待服务启动..."
+          for i in {1..15}; do
+            if curl -sf http://localhost:3000/api/health; then
+              echo "" && echo "✅ 健康检查通过！"
+              docker stop study-helper-ci
+              exit 0
+            fi
+            echo "  第 $i 次尝试，等待 2s..."
+            sleep 2
+          done
+          echo "❌ 健康检查超时"
+          docker logs study-helper-ci
+          docker stop study-helper-ci
+          exit 1
+
+  # ─────────────────────────────────────────────
+  # Job 5: Docker 镜像构建 & 推送（手动触发时）
+  # ─────────────────────────────────────────────
+  docker-push:
+    name: Docker 推送
+    needs: [frontend-build, backend-check]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push_docker == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 QEMU（多架构）
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 提取 Docker 元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DOCKERHUB_IMAGE }}
+            ${{ env.GHCR_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.version != '' }}
+            type=sha,prefix=sha-,format=short
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: 输出构建结果
+        run: |
+          echo "## 🐳 Docker 镜像发布完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| 标签 | \`${{ steps.meta.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Hub | \`${{ env.DOCKERHUB_IMAGE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| GHCR | \`${{ env.GHCR_IMAGE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 提交 SHA | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY

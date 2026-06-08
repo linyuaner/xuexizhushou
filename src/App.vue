@@ -16,12 +16,16 @@ import { useUserStore } from '@/stores/user'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import { useWindowSize } from '@vueuse/core'
+import { useVersion } from '@/utils/version'
 
 const userStore = useUserStore()
 const { width } = useWindowSize()
 
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const isMobile = computed(() => width.value < 768)
+
+// 初始化版本检查和自动更新
+useVersion()
 
 onMounted(() => {
   userStore.init()

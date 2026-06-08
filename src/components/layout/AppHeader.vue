@@ -21,6 +21,9 @@
                 <el-dropdown-item command="profile">
                   <el-icon><User /></el-icon> 个人中心
                 </el-dropdown-item>
+                <el-dropdown-item v-if="hasNewVersion" command="update" divided>
+                  <el-icon><Refresh /></el-icon> 更新版本
+                </el-dropdown-item>
                 <el-dropdown-item command="logout" divided>
                   <el-icon><SwitchButton /></el-icon> 退出登录
                 </el-dropdown-item>
@@ -31,6 +34,7 @@
         <template v-else>
           <el-button type="primary" @click="$router.push('/login')">登录</el-button>
         </template>
+        <span class="version-tag">v{{ version }}</span>
       </div>
     </div>
   </el-header>
@@ -40,8 +44,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Reading, User, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { Reading, User, ArrowDown, SwitchButton, Refresh } from '@element-plus/icons-vue'
 import { useWindowSize } from '@vueuse/core'
+import { backendVersion, frontendVersion, hasNewVersion, checkBackendVersion, handleUpdate } from '@/utils/version'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -50,6 +55,12 @@ const { width } = useWindowSize()
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const userInfo = computed(() => userStore.userInfo)
 const isMobile = computed(() => width.value < 768)
+
+const version = computed(() => {
+  const fe = frontendVersion
+  const be = backendVersion.value || 'unknown'
+  return be !== fe && be !== 'unknown' ? `${fe} (后端:${be})` : fe
+})
 
 const isScrolled = ref(false)
 
@@ -60,6 +71,8 @@ const handleScroll = () => {
 const handleCommand = (command) => {
   if (command === 'profile') {
     router.push('/profile')
+  } else if (command === 'update') {
+    handleUpdate()
   } else if (command === 'logout') {
     userStore.logout()
     router.push('/')
@@ -127,5 +140,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
+}
+
+.version-tag {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  white-space: nowrap;
 }
 </style>
