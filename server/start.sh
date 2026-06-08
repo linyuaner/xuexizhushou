@@ -175,12 +175,22 @@ main() {
     # 主服务循环（支持热更新后重启）
     while true; do
         cd "$SERVER_DIR"
-        node dist/index.js &
+        node dist/index.js > "$DATA_DIR/app.log" 2>&1 &
         MAIN_PID=$!
         log "主服务进程 PID: $MAIN_PID"
         
         # 等待进程结束或被信号中断
-        wait $MAIN_PID 2>/dev/null || true
+        wait $MAIN_PID 2>/dev/null
+        EXIT_CODE=$?
+        
+        if [ $EXIT_CODE -ne 0 ]; then
+            log "主服务异常退出 (exit code: $EXIT_CODE)"
+            log "最近 50 行日志:"
+            tail -50 "$DATA_DIR/app.log" 2>/dev/null | while IFS= read -r line; do
+                log "  [APP] $line"
+            done
+            break
+        fi
         
         # 检查是否需要重启（热更新后）
         if check_need_restart; then
