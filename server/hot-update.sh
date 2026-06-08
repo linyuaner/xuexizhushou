@@ -59,19 +59,28 @@ version_compare() {
         return 0
     fi
     
-    local IFS='.'
-    local ver1=($v1)
-    local ver2=($v2)
+    local v1_major v1_minor v1_patch v2_major v2_minor v2_patch
     
-    for i in 0 1 2; do
-        local n1=${ver1[$i]:-0}
-        local n2=${ver2[$i]:-0}
-        if [ "$n1" -gt "$n2" ]; then
-            return 1
-        elif [ "$n1" -lt "$n2" ]; then
-            return 2
-        fi
-    done
+    v1_major=$(echo "$v1" | cut -d. -f1)
+    v1_minor=$(echo "$v1" | cut -d. -f2)
+    v1_patch=$(echo "$v1" | cut -d. -f3)
+    v2_major=$(echo "$v2" | cut -d. -f1)
+    v2_minor=$(echo "$v2" | cut -d. -f2)
+    v2_patch=$(echo "$v2" | cut -d. -f3)
+    
+    v1_major=${v1_major:-0}
+    v1_minor=${v1_minor:-0}
+    v1_patch=${v1_patch:-0}
+    v2_major=${v2_major:-0}
+    v2_minor=${v2_minor:-0}
+    v2_patch=${v2_patch:-0}
+    
+    if [ "$v1_major" -gt "$v2_major" ]; then return 1; fi
+    if [ "$v1_major" -lt "$v2_major" ]; then return 2; fi
+    if [ "$v1_minor" -gt "$v2_minor" ]; then return 1; fi
+    if [ "$v1_minor" -lt "$v2_minor" ]; then return 2; fi
+    if [ "$v1_patch" -gt "$v2_patch" ]; then return 1; fi
+    if [ "$v1_patch" -lt "$v2_patch" ]; then return 2; fi
     return 0
 }
 
