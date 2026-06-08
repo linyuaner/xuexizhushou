@@ -53,7 +53,7 @@ router.get('/', optionalAuth, (req: Request, res: Response) => {
         ORDER BY has_practiced ASC, q.created_at DESC
         LIMIT ? OFFSET ?
       `
-      dataParams = [userId, ...params, limitNum, offset]
+      dataParams = [...params, userId, limitNum, offset]
     } else {
       dataQuery = `
         SELECT q.*, c.name as category_name
