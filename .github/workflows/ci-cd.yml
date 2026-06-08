@@ -222,12 +222,12 @@ jobs:
           exit 1
 
   # ─────────────────────────────────────────────
-  # Job 5: Docker 镜像构建 & 推送
+  # Job 5: Docker 镜像构建 & 推送（仅手动触发）
   # ─────────────────────────────────────────────
   docker-push:
     name: Docker 推送
-    needs: [version, frontend-build, backend-check]
-    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.push_docker == 'true')
+    needs: [frontend-build, backend-check]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push_docker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
