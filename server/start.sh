@@ -145,8 +145,10 @@ main() {
     log "应用版本: $APP_VERSION"
     log "存储版本: $STORED_VERSION"
     
-    version_compare "$APP_VERSION" "$STORED_VERSION"
-    case $? in
+    COMPARE_RESULT=0
+    version_compare "$APP_VERSION" "$STORED_VERSION" || COMPARE_RESULT=$?
+    
+    case $COMPARE_RESULT in
         0)
             log "版本一致，无需更新"
             ;;
