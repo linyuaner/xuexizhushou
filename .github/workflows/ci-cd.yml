@@ -28,7 +28,7 @@ concurrency:
 
 # 全局变量
 env:
-  DOCKERHUB_IMAGE: linyuaner/xuexizhushou
+  DOCKERHUB_IMAGE: jqlshr/study-helper
   GHCR_IMAGE: ghcr.io/${{ github.repository }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
